@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keyfolio Landlord Portal</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <h2>Keyfolio Landlord Portal</h2>
+  <p>Please sign in to continue</p>
+        
+  <div id="googleBtn"></div>
+        
+  <p id="status" style="margin-top: 20px; color: gray;"></p>
+    <script>
+      // Keep your handleCredentialResponse function exactly the same as before
+      function handleCredentialResponse(response) {
+	  const statusEl = document.getElementById("status");
+	  statusEl.style.color = "blue";
+	  statusEl.innerText = "Verifying authentication with Keyfolio servers...";
+
+	  // The secure JWT token is inside response.credential
+	  const idToken = response.credential;
+
+	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
+	  fetch('http://localhost:8000/api/google-sso', {
+              method: 'POST',
+              headers: {
+		  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ token: idToken })
+	  })
+	      .then(async (res) => {
+		  const data = await res.json();
+		  if (!res.ok) {
+		      throw new Error(data.detail || 'Authentication failed');
+		  }
+		  return data;
+	      })
+	      .then((data) => {
+		  statusEl.style.color = "green";
+		  statusEl.innerText = `Success: ${data.message}`;
+		  console.log("Backend Response:", data);
+		  
+		  // Authentication successful! You can now store the profile/token or redirect:
+		  // localStorage.setItem("token", data.token);
+		  // window.location.href = "/dashboard.html";
+	      })
+	      .catch((error) => {
+		  statusEl.style.color = "red";
+		  statusEl.innerText = `Error: ${error.message}`;
+		  console.error("SSO Error:", error);
+	      });
+      }
+
+      // Update the window.onload logic to dynamically fetch the config
+      window.onload = function () {
+	  const statusEl = document.getElementById("status");
+
+	  // 1. Fetch the public config from your FastAPI backend
+	  fetch('http://localhost:8000/api/config')
+              .then((res) => {
+		  if (!res.ok) throw new Error("Failed to load server configuration");
+		  return res.json();
+              })
+              .then((config) => {
+		  // 2. Initialize Google GSI using the dynamic ID from backend/.env
+		  google.accounts.id.initialize({
+                      client_id: config.google_client_id, // <-- Dynamic variable from server!
+                      callback: handleCredentialResponse
+		  });
+
+		  // 3. Render the button now that Google is initialized
+		  google.accounts.id.renderButton(
+                      document.getElementById("googleBtn"),
+                      { theme: "outline", size: "large", text: "signin_with" }
+		  );
+
+		  google.accounts.id.prompt(); // Optional One Tap
+              })
+              .catch((err) => {
+		  statusEl.style.color = "red";
+		  statusEl.innerText = `Configuration Error: ${err.message}`;
+		  console.error(err);
+              });
+      };    
+    </script>
+</body>
+</html>
