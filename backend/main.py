@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from pathlib import Path
+import random
 
 current_dir = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=current_dir / ".env")
@@ -85,18 +86,36 @@ def google_sso(body: GoogleTokenBody):
         # Fixed the database collection mismatch here (using 'users' consistently)
         user = db.landlords.find_one({"email": email})
         if user is None:
+            users = db.landlords.find()
+            code = ""
+            isCodeUnique = False
+            isCurrentCodeUnique = True
+            while(isCodeUnique == False):
+                isCurrentCodeUnique = True
+                code = "".join(chr(random.randint(65, 90)) for _ in range(7))
+                for i in users:
+                    if(code == i["code"]):
+                        isCurrentCodeUnique = False
+                if(isCurrentCodeUnique == True):
+                    isCodeUnique = True
             db.landlords.insert_one(
                 {
                     "email": email,
                     "googleId": google_id,
                     "first_name": idinfo.get("given_name", ""),
                     "last_name": idinfo.get("family_name", ""),
+                    "code": code,
                 }
             )
             user = db.landlords.find_one({"email": email})
-            message = f"Signed up as {email}"
+            name = user.get("first_name") + " " + user.get("last_name")
+            code = user.get("code")
+            message = f"Signed up as {name}. Code is {code}."
         else:
-            message = f"Signed in as {email}"
+            user = db.landlords.find_one({"email": email})
+            name = user.get("first_name") + " " + user.get("last_name")
+            code = user.get("code")
+            message = f"Signed in as {name}. Code is {code}."
 
         onboarded = user_is_onboarded(user)
     except Exception as exc:
