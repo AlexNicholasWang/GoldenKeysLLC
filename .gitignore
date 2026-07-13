@@ -1,6 +1,6 @@
 *~
 .env
-
+.venv/
 # Dependencies
 node_modules/
 jspm_packages/
