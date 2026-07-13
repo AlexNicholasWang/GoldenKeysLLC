@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keyfolio Tenant Signin</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <h2>Keyfolio Tenant Signin</h2>
+  <a href="index.html">Go Home</a>
+  <p>Enter code to sign up</p>
+  
+  <form id="codeForm">
+    <input type="text" id="code" name="code" placeholder="Enter Code Here" required><br><br>
+    <input type="submit" value="Submit">
+  </form>
+  
+  <p id="status" style="margin-top: 20px; color: gray; font-family: Arial, sans-serif;"></p>
+
+  <p>or sign in</p>
+        
+  <script>
+    // Handle the code verification form submission
+    document.getElementById("codeForm").addEventListener("submit", function(e) {
+        e.preventDefault(); // Stop the page from reloading on submit
+
+        const codeInput = document.getElementById("code").value.trim();
+        const statusEl = document.getElementById("status");
+
+        if (!codeInput) {
+            statusEl.style.color = "red";
+            statusEl.innerText = "Please enter a code.";
+            return;
+        }
+
+        statusEl.style.color = "blue";
+        statusEl.innerText = "Verifying code with server...";
+
+        // Send the code to the FastAPI backend
+        fetch('http://localhost:8000/api/verify-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ code: codeInput })
+        })
+        .then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Verification failed');
+            }
+            return data;
+        })
+        .then((data) => {
+            statusEl.style.color = "green";
+            statusEl.innerText = `Success! Landlord Found: ${data.landlord_name}`;
+            console.log("Server response:", data);
+	    sessionStorage.setItem("code", codeInput);
+	    
+        })
+        .catch((error) => {
+            statusEl.style.color = "red";
+            statusEl.innerText = `Error: ${error.message}`;
+            console.error("Verification Error:", error);
+        });
+    });
+  </script>
+</body>
+</html>

@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keyfolio Landlord Portal</title>
+    <title>Keyfolio Landlord Signin</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <h2>Keyfolio Landlord Portal</h2>
+  <h2>Keyfolio Landlord Signin</h2>
+  <a href="index.html">Go Home</a>
   <p>Please sign in to continue</p>
         
   <div id="googleBtn"></div>
@@ -24,7 +25,7 @@
 	  const idToken = response.credential;
 
 	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
-	  fetch('http://localhost:8000/api/google-sso', {
+	  fetch('http://localhost:8000/api/google-sso-landlord', {
               method: 'POST',
               headers: {
 		  'Content-Type': 'application/json'

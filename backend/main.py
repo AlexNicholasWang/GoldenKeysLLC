@@ -44,8 +44,8 @@ def _google_client_id() -> str:
 def user_is_onboarded(user) -> bool:
     return user.get("onboarded", False)
 
-@router.post("/google-sso")
-def google_sso(body: GoogleTokenBody):
+@router.post("/google-sso-landlord")
+def google_sso_landlord(body: GoogleTokenBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
@@ -230,5 +230,127 @@ def get_config():
         raise HTTPException(status_code=500, detail="Google Client ID not configured on server")
     
     return {"google_client_id": client_id}
+
+
+@router.post("/google-sso-landlord")
+def google_sso_landlord(body: GoogleTokenBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
+                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
+            ),
+        )
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.token,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token",
+        )
+
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=401,
+            detail="Google account has no email on file",
+        )
+
+    google_id = idinfo["sub"]
+
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        
+        # Fixed the database collection mismatch here (using 'users' consistently)
+        user = db.landlords.find_one({"email": email})
+        if user is None:
+            users = db.landlords.find()
+            code = ""
+            isCodeUnique = False
+            isCurrentCodeUnique = True
+            while(isCodeUnique == False):
+                isCurrentCodeUnique = True
+                code = "".join(chr(random.randint(65, 90)) for _ in range(7))
+                for i in users:
+                    if(code == i["code"]):
+                        isCurrentCodeUnique = False
+                if(isCurrentCodeUnique == True):
+                    isCodeUnique = True
+            db.landlords.insert_one(
+                {
+                    "email": email,
+                    "googleId": google_id,
+                    "first_name": idinfo.get("given_name", ""),
+                    "last_name": idinfo.get("family_name", ""),
+                    "code": code,
+                }
+            )
+            user = db.landlords.find_one({"email": email})
+            name = user.get("first_name") + " " + user.get("last_name")
+            code = user.get("code")
+            message = f"Signed up as {name}. Code is {code}."
+        else:
+            user = db.landlords.find_one({"email": email})
+            name = user.get("first_name") + " " + user.get("last_name")
+            code = user.get("code")
+            message = f"Signed in as {name}. Code is {code}."
+
+        onboarded = user_is_onboarded(user)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error during sign-in: {exc}",
+        ) from exc
+
+    profile = user.get("local_storage", []) if (onboarded and user) else None
+    return {
+        "message": message,
+        "email": email,
+        "onboarded": onboarded,
+        "token": body.token,
+        "profile": profile,
+    }
+
+class VerifyCodeBody(BaseModel):
+    code: str
+
+@app.post("/api/verify-code")
+def verify_code(body: VerifyCodeBody):
+    search_code = body.code.strip()
+    if not search_code:
+        raise HTTPException(status_code=400, detail="Provided code cannot be empty")
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        landlord = db.landlords.find_one({"code": search_code})
+        if(landlord is None):
+            raise HTTPException(
+                status_code=404, 
+                detail="Invalid code. No landlord matches this configuration."
+            )
+        name = landlord.get("first_name", "") + " " + landlord.get("last_name", "")
+        return {
+            "status": "success",
+            "landlord_name": name
+        }
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error during code validation: {exc}",
+        ) from exc
+
+# 4. Register the router onto the main app instance
+app.include_router(router)
 
 app.include_router(router)
