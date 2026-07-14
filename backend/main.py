@@ -105,6 +105,7 @@ def google_sso_landlord(body: GoogleTokenBody):
                     "first_name": idinfo.get("given_name", ""),
                     "last_name": idinfo.get("family_name", ""),
                     "code": code,
+                    "tenants": []
                 }
             )
             user = db.landlords.find_one({"email": email})
@@ -149,76 +150,6 @@ def _google_client_id() -> str:
         os.environ.get("GOOGLE_CLIENT_ID", "").strip()
         or os.environ.get("VITE_GOOGLE_CLIENT_ID", "").strip()
     )
-
-
-@router.post("/google-sso")
-def google_sso(body: GoogleTokenBody):
-    """
-    Verify Google ID token, upsert user, return onboarded status (one round trip).
-    """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
-
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
-
-    email = idinfo.get("email")
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
-
-    google_id = idinfo["sub"]
-
-    try:
-        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-        user = db.landlords.find_one({"email": email})
-        if user is None:
-            db.landlords.insert_one(
-                {
-                    "email": email,
-                    "googleId": google_id,
-                    "first_name": idinfo["given_name"],
-                    "last_name": idinfo["family_name"],
-                }
-            )
-            user = db.landlords.find_one({"email": email})
-            message = f"Signed up as {email}"
-        else:
-            message = f"Signed in as {email}"
-
-        onboarded = user_is_onboarded(user)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Database error during sign-in: {exc}",
-        ) from exc
-
-    profile = user.get("local_storage", []) if (onboarded and user) else None
-    return {
-        "message": message,
-        "email": email,
-        "onboarded": onboarded,
-        "token": body.token,
-        "profile": profile,
-    }
 
 @app.get("/api/config")
 def get_config():
@@ -293,6 +224,7 @@ def google_sso_landlord(body: GoogleTokenBody):
                     "first_name": idinfo.get("given_name", ""),
                     "last_name": idinfo.get("family_name", ""),
                     "code": code,
+                    "tenants": []
                 }
             )
             user = db.landlords.find_one({"email": email})
@@ -350,7 +282,89 @@ def verify_code(body: VerifyCodeBody):
             detail=f"Database error during code validation: {exc}",
         ) from exc
 
+class TenantSignupBody(BaseModel):
+    token: str
+    code: str
+@router.post("/google-sso-tenant-signup")
+def google_sso_tenant_signup(body: TenantSignupBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
+                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
+            ),
+        )
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.token,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token",
+        )
+
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=401,
+            detail="Google account has no email on file",
+        )
+
+    google_id = idinfo["sub"]
+
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        
+        # Fixed the database collection mismatch here (using 'users' consistently)
+        landlord = db.landlords.find_one({"code": body.code})
+        if(landlord == None):
+            raise HTTPException(status_code=400, detail="Landlord not found") 
+        # bookmark
+        query_filter = {"code": body.code, "tenants.email": {"$ne": email}}
+        new_tenant_data = {
+            "email": email,
+            "googleId": google_id,
+            "first_name": idinfo.get("given_name", ""),
+            "last_name": idinfo.get("family_name", "")
+        }
+        update_operation = {"$push": {"tenants": new_tenant_data}}
+        result = db.landlords.update_one(query_filter, update_operation)
+        fullName = idinfo.get("given_name", "") + " " + idinfo.get("family_name", "")
+        landlordName = f"{landlord.get('first_name', '')} {landlord.get('last_name', '')}".strip()
+        if result.modified_count == 0:
+            # Landlord code was valid, but 0 modifications means the email was already in the array
+            message = f"Welcome back! You are already enrolled in {landlordName}'s community as {fullName}."
+        else:
+            # Modification count is 1, meaning they were successfully added
+            message = f"Success! You enrolled in {landlordName}'s community as {fullName}."
+        # add to landlord the user
+        onboarded = user_is_onboarded(landlord)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error during sign-in: {exc}",
+        ) from exc
+
+    profile = user.get("local_storage", []) if (onboarded and user) else None
+    return {
+        "message": message,
+        "email": email,
+        "onboarded": onboarded,
+        "token": body.token,
+        "profile": profile,
+    }
+
+
 # 4. Register the router onto the main app instance
-app.include_router(router)
+
 
 app.include_router(router)

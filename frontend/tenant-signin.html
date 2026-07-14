@@ -57,7 +57,8 @@
             statusEl.innerText = `Success! Landlord Found: ${data.landlord_name}`;
             console.log("Server response:", data);
 	    sessionStorage.setItem("code", codeInput);
-	    
+	    sessionStorage.setItem("landlordName", data.landlord_name);
+	    window.location.href = "tenant-signup.html";
         })
         .catch((error) => {
             statusEl.style.color = "red";
