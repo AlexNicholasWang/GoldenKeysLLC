@@ -129,6 +129,9 @@ def google_sso_landlord(body: GoogleTokenBody):
     return {
         "message": message,
         "email": email,
+        "firstName": user.get("first_name"),
+        "lastName": user.get("last_name"),
+        "code": user.get("code"),
         "onboarded": onboarded,
         "token": body.token,
         "profile": profile,
@@ -358,7 +361,7 @@ def google_sso_tenant_signup(body: TenantSignupBody):
             detail=f"Database error during sign-in: {exc}",
         ) from exc
 
-    profile = user.get("local_storage", []) if (onboarded and user) else None
+    profile = landlord.get("local_storage", []) if (onboarded and landlord) else None
     return {
         "message": message,
         "email": email,
@@ -433,6 +436,76 @@ def google_sso_tenant_signin(body: GoogleTokenBody):
         "tenant_name": tenant_name,
         "landlord_code": landlord_code,
         "token": body.token,
+    }
+
+@router.post("/get-landlord-data")
+def get_landlord_data(body: GoogleTokenBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
+                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
+            ),
+        )
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.token,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token",
+        )
+    tenants = []
+    name = ""
+    email = idinfo.get("email")
+    message = ""
+    if not email:
+        raise HTTPException(
+            status_code=401,
+            detail="Google account has no email on file",
+        )
+
+    google_id = idinfo["sub"]
+
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        
+        # Fixed the database collection mismatch here (using 'users' consistently)
+        user = db.landlords.find_one({"email": email})
+        if user is None:
+            raise HTTPException(status_code=404, detail="Could not authenticate. Please try signing in again.");
+        else:
+            user = db.landlords.find_one({"email": email})
+            name = user.get("first_name") + " " + user.get("last_name")
+            code = user.get("code")
+            tenants = user.get("tenants")
+            message = f"Welcome back {name}"
+
+        onboarded = user_is_onboarded(user)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error during sign-in: {exc}",
+        ) from exc
+
+    profile = user.get("local_storage", []) if (onboarded and user) else None
+    return {
+        "message": message,
+        "email": email,
+        "tenants": tenants,
+        "name": name,
+        "onboarded": onboarded,
+        "token": body.token,
+        "profile": profile,
     }
 
 

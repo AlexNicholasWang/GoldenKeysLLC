@@ -43,10 +43,14 @@
 		  statusEl.style.color = "green";
 		  statusEl.innerText = `Success: ${data.message}`;
 		  console.log("Backend Response:", data);
-		  
+		  sessionStorage.setItem("firstName", data.firstName);
+		  sessionStorage.setItem("lastName", data.lastName);
+		  sessionStorage.setItem("code", data.code);
+		  console.log(idToken);
+		  sessionStorage.setItem("googleToken", idToken);
 		  // Authentication successful! You can now store the profile/token or redirect:
 		  // localStorage.setItem("token", data.token);
-		  // window.location.href = "/dashboard.html";
+		  window.location.href = "landlord-dashboard.html";
 	      })
 	      .catch((error) => {
 		  statusEl.style.color = "red";
