@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Keyfolio Landlord Dashboard</title>
+</head>
+<body>
+
+  <div id="error" style="display: none;">Authentication failed. Try to sign in again.</div>
+  <div id="dashboard" style="display: none;">
+    <h1 id="welcome"></h1>
+    <a href="index.html">Go Home</a>
+    <br>
+    <h3>Tenants</h3>
+    <table border="1">
+      <thead>
+        <tr>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody id="tenants-list"></tbody>
+    </table>
+  </div>
+
+  <script>
+    window.onload = function() {
+      const token = sessionStorage.getItem("googleToken");
+      
+      if (!token) {
+        document.getElementById("error").style.display = "block";
+        return;
+      }
+
+      fetch("http://localhost:8000/api/get-landlord-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ token: token })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error();
+        }
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById("welcome").textContent = "Welcome back " + data.name;
+        
+        const tbody = document.getElementById("tenants-list");
+        tbody.innerHTML = "";
+        
+        const tenants = data.tenants || [];
+        tenants.forEach(tenant => {
+          const tr = document.createElement("tr");
+          
+          const tdFirst = document.createElement("td");
+          tdFirst.textContent = tenant.first_name || "";
+          tr.appendChild(tdFirst);
+          
+          const tdLast = document.createElement("td");
+          tdLast.textContent = tenant.last_name || "";
+          tr.appendChild(tdLast);
+          
+          const tdEmail = document.createElement("td");
+          tdEmail.textContent = tenant.email || "";
+          tr.appendChild(tdEmail);
+          
+          tbody.appendChild(tr);
+        });
+        
+        document.getElementById("dashboard").style.display = "block";
+      })
+      .catch(() => {
+        document.getElementById("error").style.display = "block";
+      });
+    };
+  </script>
+</body>
+</html>

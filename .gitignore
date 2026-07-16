@@ -23,3 +23,5 @@ pnpm-debug.log*
 
 # Python stuff
 __pycache__/
+**/__pycache__/
+*.py[cod]
