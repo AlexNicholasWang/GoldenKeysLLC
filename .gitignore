@@ -1,5 +1,10 @@
+# Emacs stuff
 *~
+
+# Env stuff
 .env
+.venv/
+
 
 # Dependencies
 node_modules/
@@ -15,3 +20,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Python stuff
+__pycache__/
