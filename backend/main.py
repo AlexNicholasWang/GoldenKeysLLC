@@ -325,6 +325,11 @@ def google_sso_tenant_signup(body: TenantSignupBody):
         db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
         
         # Fixed the database collection mismatch here (using 'users' consistently)
+        landlords = db.landlords.find()
+        for landlord in landlords: # bookmark
+            for tenant in landlord.get("tenants"):
+                if(tenant["email"] == email):
+                    raise HTTPException(status_code=405, detail="Already signed up as a tenant. Cannot sign up twice")
         landlord = db.landlords.find_one({"code": body.code})
         if(landlord == None):
             raise HTTPException(status_code=400, detail="Landlord not found") 
