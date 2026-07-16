@@ -326,14 +326,13 @@ def google_sso_tenant_signup(body: TenantSignupBody):
         
         # Fixed the database collection mismatch here (using 'users' consistently)
         landlords = db.landlords.find()
-        for landlord in landlords: # bookmark
+        for landlord in landlords:
             for tenant in landlord.get("tenants"):
                 if(tenant["email"] == email):
                     raise HTTPException(status_code=405, detail="Already signed up as a tenant. Cannot sign up twice")
         landlord = db.landlords.find_one({"code": body.code})
         if(landlord == None):
             raise HTTPException(status_code=400, detail="Landlord not found") 
-        # bookmark
         query_filter = {"code": body.code, "tenants.email": {"$ne": email}}
         new_tenant_data = {
             "email": email,
@@ -366,6 +365,74 @@ def google_sso_tenant_signup(body: TenantSignupBody):
         "onboarded": onboarded,
         "token": body.token,
         "profile": profile,
+    }
+
+@router.post("/google-sso-tenant-signin") # bookmark
+def google_sso_tenant_signin(body: GoogleTokenBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
+                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
+            ),
+        )
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.token,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token",
+        )
+
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=401,
+            detail="Google account has no email on file",
+        )
+
+    google_id = idinfo["sub"]
+    landlord_name = ""
+    tenant_name = ""
+    landlord_code = ""
+    doesTenantExist = False
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        
+        # Fixed the database collection mismatch here (using 'users' consistently)
+        landlords = db.landlords.find()
+        for landlord in landlords:
+            for tenant in landlord.get("tenants"):
+                if(tenant["email"] == email):
+                    doesTenantExist = True
+                    landlord_name = landlord.get("first_name") + " " +  landlord.get("last_name")
+                    tenant_name = tenant["first_name"] + " " + tenant["last_name"]
+                    landlord_code = landlord.get("code")
+                    message = f"Signed in as {tenant_name} in {landlord_name}'s community"
+        if(doesTenantExist == False):
+            raise HTTPException(status_code=404, detail="Tenant's account does not exist. Try signing up with your landlord's code.")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error during sign-in: {exc}",
+        ) from exc
+    return {
+        "message": message,
+        "email": email,
+        "landlord_name": landlord_name,
+        "tenant_name": tenant_name,
+        "landlord_code": landlord_code,
+        "token": body.token,
     }
 
 
