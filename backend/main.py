@@ -70,11 +70,10 @@ def change_tenant_info(body: TenantChangeBody):
             status_code=401,
             detail="Google account has no email on file",
         )
-    db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-    user = db.landlords.find_one({"email": email})
-    
-    tenants = user.get("tenants")
     try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        user = db.landlords.find_one({"email": email})
+        tenants = user.get("tenants")
         result = db.landlords.update_one(
             {"email": email},
             {
@@ -107,7 +106,80 @@ def _google_client_id() -> str:
 # Placeholder helper function (ensure this is defined or imported in your actual code)
 def user_is_onboarded(user) -> bool:
     return user.get("onboarded", False)
+class TenantDataRequestBody(BaseModel):
+    code: str
+    token: str
+@router.post("/get-tenant-data")
+def get_tenant_data(body: TenantDataRequestBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
+                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
+            ),
+        )
 
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.token,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token",
+        )
+
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=401,
+            detail="Google account has no email on file",
+        )
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        landlord = db.landlords.find_one({"code": body.code})
+        if landlord is None:
+            raise HTTPException(
+                status_code=404, 
+                detail="Invalid code. No landlord matches this configuration."
+            )
+        tenants = landlord.get("tenants")
+        for tenant in tenants:
+            if(tenant["email"] == email):
+                first_name = tenant["first_name"]
+                last_name = tenant["last_name"]
+                address = tenant["address"]
+                date = tenant["date"]
+                day = tenant["day"]
+                rent = tenant["rent"]
+                message = "Success"
+                return {
+                    "message": message,
+                    "email": email,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "address": address,
+                    "date": date,
+                    "day": day,
+                    "rent": rent,
+                }
+        raise HTTPException(
+                status_code=404, 
+                detail="No tenant found."
+            )
+    # bookmark
+    except ValueError:
+        raise HTTPException(
+            status_code=404,
+            detail="No tenant found",
+        )
 @router.post("/google-sso-landlord")
 def google_sso_landlord(body: GoogleTokenBody):
     """

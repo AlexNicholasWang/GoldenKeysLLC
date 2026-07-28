@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Keyfolio Tenant Dashboard</title>
+</head>
+<body onload="fetchTenantData()">
+
+    <h2 id="welcomeMessage"></h2>
+    <a href="index.html">Go Home</a>
+    <br><br>
+    <table border="1" id="tenantTable" style="display: none;">
+        <thead>
+            <tr>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Email</th>
+                <th>Address</th>
+                <th>Rent</th>
+                <th>Day</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td id="firstName"></td>
+                <td id="lastName"></td>
+                <td id="email"></td>
+                <td id="address"></td>
+                <td id="rent"></td>
+                <td id="day"></td>
+                <td id="date"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p id="status"></p>
+
+    <script>
+        async function fetchTenantData() {
+            const statusElem = document.getElementById("status");
+            const welcomeElem = document.getElementById("welcomeMessage");
+            const code = sessionStorage.getItem("code");
+            const ssoToken = sessionStorage.getItem("ssoToken");
+
+            if (!code || !ssoToken) {
+                statusElem.textContent = "Error: Missing 'code' or 'ssoToken' in sessionStorage.";
+                return;
+            }
+
+            try {
+                // Adjust host/port if your Uvicorn server uses a different address
+                const response = await fetch("http://127.0.0.1:8000/api/get-tenant-data", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        token: ssoToken
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    statusElem.textContent = "Error: " + (errorData.detail || "Failed to fetch data.");
+                    return;
+                }
+
+                const data = await response.json();
+                const firstName = data.first_name || "";
+                const lastName = data.last_name || "";
+
+                // Display welcome heading
+                welcomeElem.textContent = `Welcome back ${firstName} ${lastName}`.trim();
+
+                // Populate table cells in requested order
+                document.getElementById("firstName").textContent = firstName;
+                document.getElementById("lastName").textContent = lastName;
+                document.getElementById("email").textContent = data.email || "";
+                document.getElementById("address").textContent = data.address || "";
+                document.getElementById("rent").textContent = data.rent || "";
+                document.getElementById("day").textContent = data.day || "";
+                document.getElementById("date").textContent = data.date || "";
+
+                // Show table
+                document.getElementById("tenantTable").style.display = "table";
+            } catch (err) {
+                statusElem.textContent = "Network error: Unable to connect to server.";
+            }
+        }
+    </script>
+
+</body>
+</html>
