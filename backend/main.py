@@ -30,10 +30,74 @@ app.add_middleware(
 
 # 3. Define your router and endpoints
 router = APIRouter(prefix="/api", tags=["Authentication"])
+class TenantChangeBody(BaseModel):
+    ssoToken: str
+    tenantEmail: str
+    address: str
+    rent: float
+    day: int
+    date: str
+@router.post("/change-tenant-info")
+def change_tenant_info(body: TenantChangeBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
+                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
+            ),
+        )
 
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            body.ssoToken,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token",
+        )
+
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=401,
+            detail="Google account has no email on file",
+        )
+    db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+    user = db.landlords.find_one({"email": email})
+    
+    tenants = user.get("tenants")
+    try:
+        result = db.landlords.update_one(
+            {"email": email},
+            {
+                "$set": {
+                    "tenants.$[t].address": body.address,
+                    "tenants.$[t].rent": body.rent,
+                    "tenants.$[t].day": body.day,
+                    "tenants.$[t].date": body.date
+                }
+            },
+            array_filters=[
+                {"t.email": body.tenantEmail}
+            ]
+        )
+        message = "Successfully Updated"
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error during sign-in: {exc}",
+        ) from exc
+    return message
 class GoogleTokenBody(BaseModel):
     token: str
-
 def _google_client_id() -> str:
     return (
         os.environ.get("GOOGLE_CLIENT_ID", "").strip()
@@ -370,7 +434,7 @@ def google_sso_tenant_signup(body: TenantSignupBody):
         "profile": profile,
     }
 
-@router.post("/google-sso-tenant-signin") # bookmark
+@router.post("/google-sso-tenant-signin")
 def google_sso_tenant_signin(body: GoogleTokenBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
