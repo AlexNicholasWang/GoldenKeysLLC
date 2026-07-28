@@ -159,6 +159,7 @@ def get_tenant_data(body: TenantDataRequestBody):
                 date = tenant["date"]
                 day = tenant["day"]
                 rent = tenant["rent"]
+                message = "Success"
                 return {
                     "message": message,
                     "email": email,

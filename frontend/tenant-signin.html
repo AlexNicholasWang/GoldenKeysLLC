@@ -32,7 +32,7 @@
 
 	  // The secure JWT token is inside response.credential
 	  const idToken = response.credential;
-
+	  sessionStorage.setItem("ssoToken", idToken);
 	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
 	  fetch('http://localhost:8000/api/google-sso-tenant-signin', {
               method: 'POST',
@@ -57,7 +57,7 @@
 		  sessionStorage.setItem("code", data.landlord_code);
 		  // Authentication successful! You can now store the profile/token or redirect:
 		  // localStorage.setItem("token", data.token);
-		  // window.location.href = "/dashboard.html";
+		  window.location.href = "/tenant-dashboard.html";
 	      })
 	      .catch((error) => {
 		  statusEl.style.color = "red";
