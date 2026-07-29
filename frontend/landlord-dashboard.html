@@ -32,27 +32,151 @@
     <script>
       document.getElementById('code-display').textContent = sessionStorage.getItem('code');
     </script>
-    <h3>Tenants</h3>
-    <div class="panel table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Email</th>
-            <th>Address</th>
-            <th>Rent ($)</th>
-            <th>Day of Month Due</th>
-            <th>Next Due Date</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="tenants-list"></tbody>
-      </table>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav" style="display: flex; gap: 10px; margin-bottom: 24px;">
+      <button id="tabTenantsBtn" class="btn" onclick="switchLandlordTab('tenants')">Tenants</button>
+      <button id="tabTicketsBtn" class="btn btn-outline" onclick="switchLandlordTab('tickets')">All Maintenance Tickets</button>
+    </div>
+
+    <!-- Tab 1: Tenants List -->
+    <div id="tenantsTabContent">
+      <h3>Tenants</h3>
+      <div class="panel table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>First Name</th>
+              <th>Last Name</th>
+              <th>Email</th>
+              <th>Address</th>
+              <th>Rent ($)</th>
+              <th>Day of Month Due</th>
+              <th>Next Due Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="tenants-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: All Tenants Maintenance Tickets -->
+    <div id="ticketsTabContent" style="display: none;">
+      <h3>All Tickets</h3>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <label for="sortTicketsSelect" style="font-weight: 600;">Sort by:</label>
+        <select id="sortTicketsSelect" onchange="renderLandlordTickets(this.value)" style="padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="tenant">Tenant</option>
+          <option value="urgency">Urgency</option>
+          <option value="category">Category</option>
+        </select>
+      </div>
+
+      <div class="panel table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tenant Name</th>
+              <th>Email</th>
+              <th>Category</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th>Date Created</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="landlord-tickets-list">
+            <tr><td colspan="7" style="text-align: center;">No tickets found.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 
   <script>
+    let allTicketsData = [];
+
+    function switchLandlordTab(tab) {
+      const tenantsTab = document.getElementById("tenantsTabContent");
+      const ticketsTab = document.getElementById("ticketsTabContent");
+      const tenantsBtn = document.getElementById("tabTenantsBtn");
+      const ticketsBtn = document.getElementById("tabTicketsBtn");
+
+      if (tab === "tenants") {
+        tenantsTab.style.display = "block";
+        ticketsTab.style.display = "none";
+        tenantsBtn.className = "btn";
+        ticketsBtn.className = "btn btn-outline";
+      } else {
+        tenantsTab.style.display = "none";
+        ticketsTab.style.display = "block";
+        tenantsBtn.className = "btn btn-outline";
+        ticketsBtn.className = "btn";
+      }
+    }
+
+    function renderLandlordTickets(sortBy = "tenant") {
+      const tbody = document.getElementById("landlord-tickets-list");
+      tbody.innerHTML = "";
+
+      if (!allTicketsData || allTicketsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No tickets found.</td></tr>';
+        return;
+      }
+
+      const sortedTickets = [...allTicketsData];
+
+      if (sortBy === "tenant") {
+        sortedTickets.sort((a, b) => a.tenantName.localeCompare(b.tenantName));
+      } else if (sortBy === "urgency") {
+        const urgencyRank = { "ASAP": 1, "Somewhat Urgent": 2, "Not urgent": 3 };
+        sortedTickets.sort((a, b) => {
+          const rankA = urgencyRank[a.urgency] || 99;
+          const rankB = urgencyRank[b.urgency] || 99;
+          if (rankA !== rankB) return rankA - rankB;
+          return a.urgency.localeCompare(b.urgency);
+        });
+      } else if (sortBy === "category") {
+        sortedTickets.sort((a, b) => a.category.localeCompare(b.category));
+      }
+
+      sortedTickets.forEach(ticket => {
+        const tr = document.createElement("tr");
+
+        const tdName = document.createElement("td");
+        tdName.textContent = ticket.tenantName;
+
+        const tdEmail = document.createElement("td");
+        tdEmail.textContent = ticket.tenantEmail;
+
+        const tdCategory = document.createElement("td");
+        tdCategory.textContent = ticket.category;
+
+        const tdUrgency = document.createElement("td");
+        tdUrgency.textContent = ticket.urgency;
+
+        const tdStatus = document.createElement("td");
+        tdStatus.textContent = ticket.status;
+
+        const tdDate = document.createElement("td");
+        tdDate.textContent = ticket.dateCreated;
+
+        const tdNotes = document.createElement("td");
+        tdNotes.textContent = ticket.notes;
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdEmail);
+        tr.appendChild(tdCategory);
+        tr.appendChild(tdUrgency);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdNotes);
+
+        tbody.appendChild(tr);
+      });
+    }
+
     window.onload = function() {
       const token = sessionStorage.getItem("googleToken");
       
@@ -81,7 +205,25 @@
         tbody.innerHTML = "";
         
         const tenants = data.tenants || [];
+        allTicketsData = [];
+
         tenants.forEach(tenant => {
+          // Flatten tickets from all tenants for the landlord's tickets tab
+          const tenantName = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.email || "Unknown Tenant";
+          const tenantTickets = tenant.tickets || [];
+
+          tenantTickets.forEach(ticket => {
+            allTicketsData.push({
+              tenantName: tenantName,
+              tenantEmail: tenant.email || "",
+              category: ticket["ticket-type"] || ticket.ticketType || "",
+              urgency: ticket["ugency"] || ticket.urgency || "",
+              status: ticket.status || "Incomplete",
+              dateCreated: ticket["date-created"] || ticket.dateCreated || "",
+              notes: ticket.notes || ""
+            });
+          });
+
           const tr = document.createElement("tr");
           
           // First Name (Read-only)
@@ -187,6 +329,9 @@
           tbody.appendChild(tr);
         });
         
+        // Initial render for landlord tickets table sorted by tenant
+        renderLandlordTickets("tenant");
+
         document.getElementById("dashboard").style.display = "block";
       })
       .catch(() => {

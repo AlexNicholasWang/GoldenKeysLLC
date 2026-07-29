@@ -181,7 +181,7 @@ def get_tenant_data(body: TenantDataRequestBody):
         tenants = landlord.get("tenants")
         for tenant in tenants:
             if(tenant["email"] == email):
-                first_name = tenant.get("fist_name")
+                first_name = tenant.get("first_name")
                 last_name = tenant.get("last_name")
                 address = tenant.get("address")
                 date = tenant.get("date")
