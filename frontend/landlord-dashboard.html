@@ -84,7 +84,7 @@
               <th>Urgency</th>
               <th>Status</th>
               <th>Date Created</th>
-              <th>Notes</th>
+              <th>Tenant's Notes</th>
             </tr>
           </thead>
           <tbody id="landlord-tickets-list">
@@ -225,7 +225,8 @@
               urgency: ticket["ugency"] || ticket.urgency || "",
               status: ticket.status || "Incomplete",
               dateCreated: ticket["date-created"] || ticket.dateCreated || "",
-              notes: ticket.notes || ""
+              // Updated key lookup to check tenant-notes first
+              notes: ticket["tenant-notes"] || ticket.notes || ""
             });
           });
 

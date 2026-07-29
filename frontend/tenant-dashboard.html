@@ -111,7 +111,7 @@
               <th>Urgency</th>
               <th>Status</th>
               <th>Date Created</th>
-              <th>Notes</th>
+              <th>Your Notes</th>
             </tr>
           </thead>
           <tbody id="ticketsList">
@@ -227,7 +227,8 @@
         tdDate.textContent = ticket["date-created"] || ticket.dateCreated || "";
 
         const tdNotes = document.createElement("td");
-        tdNotes.textContent = ticket.notes || "";
+        // Updated key lookup to check tenant-notes first
+        tdNotes.textContent = ticket["tenant-notes"] || ticket.notes || "";
 
         tr.appendChild(tdId);
         tr.appendChild(tdCategory);

@@ -89,7 +89,7 @@ def create_ticket(body: TicketCreateBody):
         toInsert = {
             "ticket-type": body.ticketType,
             "date-created": body.dateCreated,
-            "notes": body.notes,
+            "tenant-notes": body.notes,
             "status": "Incomplete",
             "ugency": body.urgency,
             "ticket-id": ticket_id,
