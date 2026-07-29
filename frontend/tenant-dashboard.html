@@ -112,10 +112,11 @@
               <th>Status</th>
               <th>Date Created</th>
               <th>Your Notes</th>
+              <th>Landlord's Notes</th>
             </tr>
           </thead>
           <tbody id="ticketsList">
-            <tr><td colspan="6" style="text-align: center;">No tickets submitted yet.</td></tr>
+            <tr><td colspan="7" style="text-align: center;">No tickets submitted yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -177,10 +178,8 @@
         const firstName = data.first_name || "";
         const lastName = data.last_name || "";
 
-        // Display welcome heading
         welcomeElem.textContent = `Welcome back ${firstName} ${lastName}`.trim();
 
-        // Populate table cells
         document.getElementById("firstName").textContent = firstName;
         document.getElementById("lastName").textContent = lastName;
         document.getElementById("email").textContent = data.email || "";
@@ -189,10 +188,8 @@
         document.getElementById("day").textContent = data.day || "";
         document.getElementById("date").textContent = data.date || "";
 
-        // Show table
         document.getElementById("tenantTable").style.display = "table";
 
-        // Render tickets list
         renderTenantTickets(data.tickets || []);
       } catch (err) {
         statusElem.textContent = "Network error: Unable to connect to server.";
@@ -204,7 +201,7 @@
       tbody.innerHTML = "";
 
       if (!tickets || tickets.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No tickets submitted yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No tickets submitted yet.</td></tr>';
         return;
       }
 
@@ -226,16 +223,19 @@
         const tdDate = document.createElement("td");
         tdDate.textContent = ticket["date-created"] || ticket.dateCreated || "";
 
-        const tdNotes = document.createElement("td");
-        // Updated key lookup to check tenant-notes first
-        tdNotes.textContent = ticket["tenant-notes"] || ticket.notes || "";
+        const tdTenantNotes = document.createElement("td");
+        tdTenantNotes.textContent = ticket["tenant-notes"] || ticket.notes || "";
+
+        const tdLandlordNotes = document.createElement("td");
+        tdLandlordNotes.textContent = ticket["landlord-notes"] || ticket.landlordNotes || "";
 
         tr.appendChild(tdId);
         tr.appendChild(tdCategory);
         tr.appendChild(tdUrgency);
         tr.appendChild(tdStatus);
         tr.appendChild(tdDate);
-        tr.appendChild(tdNotes);
+        tr.appendChild(tdTenantNotes);
+        tr.appendChild(tdLandlordNotes);
 
         tbody.appendChild(tr);
       });
@@ -257,7 +257,6 @@
       const urgency = document.getElementById("urgency").value;
       const notes = document.getElementById("notes").value;
       
-      // Get current date in US Eastern Time (YYYY-MM-DD)
       const dateCreated = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
       ticketStatus.textContent = "Submitting ticket...";
@@ -288,7 +287,6 @@
         ticketStatus.className = "status-msg status-success";
         document.getElementById("createTicketForm").reset();
 
-        // Refresh ticket list
         fetchTenantData();
       } catch (err) {
         ticketStatus.textContent = err.message || "Error creating ticket.";

@@ -93,6 +93,7 @@ def create_ticket(body: TicketCreateBody):
             "status": "Incomplete",
             "ugency": body.urgency,
             "ticket-id": ticket_id,
+            "landlord-notes": "",
         }
         result = db.landlords.update_one(
             {

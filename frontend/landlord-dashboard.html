@@ -85,10 +85,11 @@
               <th>Status</th>
               <th>Date Created</th>
               <th>Tenant's Notes</th>
+              <th>Your Notes</th>
             </tr>
           </thead>
           <tbody id="landlord-tickets-list">
-            <tr><td colspan="8" style="text-align: center;">No tickets found.</td></tr>
+            <tr><td colspan="9" style="text-align: center;">No tickets found.</td></tr>
           </tbody>
         </table>
       </div>
@@ -122,7 +123,7 @@
       tbody.innerHTML = "";
 
       if (!allTicketsData || allTicketsData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No tickets found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No tickets found.</td></tr>';
         return;
       }
 
@@ -166,8 +167,11 @@
         const tdDate = document.createElement("td");
         tdDate.textContent = ticket.dateCreated;
 
-        const tdNotes = document.createElement("td");
-        tdNotes.textContent = ticket.notes;
+        const tdTenantNotes = document.createElement("td");
+        tdTenantNotes.textContent = ticket.tenantNotes;
+
+        const tdLandlordNotes = document.createElement("td");
+        tdLandlordNotes.textContent = ticket.landlordNotes;
 
         tr.appendChild(tdId);
         tr.appendChild(tdName);
@@ -176,7 +180,8 @@
         tr.appendChild(tdUrgency);
         tr.appendChild(tdStatus);
         tr.appendChild(tdDate);
-        tr.appendChild(tdNotes);
+        tr.appendChild(tdTenantNotes);
+        tr.appendChild(tdLandlordNotes);
 
         tbody.appendChild(tr);
       });
@@ -225,8 +230,8 @@
               urgency: ticket["ugency"] || ticket.urgency || "",
               status: ticket.status || "Incomplete",
               dateCreated: ticket["date-created"] || ticket.dateCreated || "",
-              // Updated key lookup to check tenant-notes first
-              notes: ticket["tenant-notes"] || ticket.notes || ""
+              tenantNotes: ticket["tenant-notes"] || ticket.notes || "",
+              landlordNotes: ticket["landlord-notes"] || ticket.landlordNotes || ""
             });
           });
 
@@ -332,7 +337,6 @@
           tbody.appendChild(tr);
         });
         
-        // Initial render for landlord tickets table sorted by tenant
         renderLandlordTickets("tenant");
 
         document.getElementById("dashboard").style.display = "block";
