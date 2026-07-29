@@ -29,19 +29,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Define your router and endpoints
-router = APIRouter(prefix="/api", tags=["Authentication"])
-class TenantChangeBody(BaseModel):
-    ssoToken: str
-    tenantEmail: str
-    address: str
-    rent: float
-    day: int
-    date: str
-@router.post("/change-tenant-info")
-def change_tenant_info(body: TenantChangeBody):
+def _google_client_id() -> str:
+    return (
+        os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+        or os.environ.get("VITE_GOOGLE_CLIENT_ID", "").strip()
+    )
+
+def verifyGoogleID(token: str) -> dict:
     """
-    Verify Google ID token, upsert user, return onboarded status.
+    Verify Google ID token and return token payload.
     """
     client_id = _google_client_id()
     if not client_id:
@@ -55,7 +51,7 @@ def change_tenant_info(body: TenantChangeBody):
 
     try:
         idinfo = id_token.verify_oauth2_token(
-            body.ssoToken,
+            token,
             google_requests.Request(),
             client_id,
         )
@@ -71,6 +67,31 @@ def change_tenant_info(body: TenantChangeBody):
             status_code=401,
             detail="Google account has no email on file",
         )
+    return idinfo
+
+# Placeholder helper function (ensure this is defined or imported in your actual code)
+def user_is_onboarded(user) -> bool:
+    return user.get("onboarded", False)
+
+# 3. Define your router and endpoints
+router = APIRouter(prefix="/api", tags=["Authentication"])
+
+class TenantChangeBody(BaseModel):
+    ssoToken: str
+    tenantEmail: str
+    address: str
+    rent: float
+    day: int
+    date: str
+
+@router.post("/change-tenant-info")
+def change_tenant_info(body: TenantChangeBody):
+    """
+    Verify Google ID token, upsert user, return onboarded status.
+    """
+    idinfo = verifyGoogleID(body.ssoToken)
+    email = idinfo.get("email")
+
     try:
         db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
         user = db.landlords.find_one({"email": email})
@@ -96,53 +117,22 @@ def change_tenant_info(body: TenantChangeBody):
             detail=f"Database error during sign-in: {exc}",
         ) from exc
     return message
+
 class GoogleTokenBody(BaseModel):
     token: str
-def _google_client_id() -> str:
-    return (
-        os.environ.get("GOOGLE_CLIENT_ID", "").strip()
-        or os.environ.get("VITE_GOOGLE_CLIENT_ID", "").strip()
-    )
 
-# Placeholder helper function (ensure this is defined or imported in your actual code)
-def user_is_onboarded(user) -> bool:
-    return user.get("onboarded", False)
 class TenantDataRequestBody(BaseModel):
     code: str
     token: str
+
 @router.post("/get-tenant-data")
 def get_tenant_data(body: TenantDataRequestBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
-
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
-
+    idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
+
     try:
         db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
         landlord = db.landlords.find_one({"code": body.code})
@@ -181,40 +171,14 @@ def get_tenant_data(body: TenantDataRequestBody):
             status_code=404,
             detail="No tenant found",
         )
+
 @router.post("/google-sso-landlord")
 def google_sso_landlord(body: GoogleTokenBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
-
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
-
+    idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
-
     google_id = idinfo["sub"]
 
     try:
@@ -284,13 +248,6 @@ router = APIRouter(prefix="/api", tags=["Authentication"])
 class GoogleTokenBody(BaseModel):
     token: str
 
-
-def _google_client_id() -> str:
-    return (
-        os.environ.get("GOOGLE_CLIENT_ID", "").strip()
-        or os.environ.get("VITE_GOOGLE_CLIENT_ID", "").strip()
-    )
-
 @app.get("/api/config")
 def get_config():
     """
@@ -302,41 +259,13 @@ def get_config():
     
     return {"google_client_id": client_id}
 
-
 @router.post("/google-sso-landlord")
 def google_sso_landlord(body: GoogleTokenBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
-
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
-
+    idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
-
     google_id = idinfo["sub"]
 
     try:
@@ -425,40 +354,14 @@ def verify_code(body: VerifyCodeBody):
 class TenantSignupBody(BaseModel):
     token: str
     code: str
+
 @router.post("/google-sso-tenant-signup")
 def google_sso_tenant_signup(body: TenantSignupBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
-
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
-
+    idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
-
     google_id = idinfo["sub"]
 
     try:
@@ -512,36 +415,10 @@ def google_sso_tenant_signin(body: GoogleTokenBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
-
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
-
+    idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
-
     google_id = idinfo["sub"]
+
     landlord_name = ""
     tenant_name = ""
     landlord_code = ""
@@ -580,38 +457,13 @@ def get_landlord_data(body: GoogleTokenBody):
     """
     Verify Google ID token, upsert user, return onboarded status.
     """
-    client_id = _google_client_id()
-    if not client_id:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set GOOGLE_CLIENT_ID in backend/.env, or VITE_GOOGLE_CLIENT_ID in frontend/.env "
-                "(same OAuth 2.0 Web client ID from Google Cloud Console)."
-            ),
-        )
+    idinfo = verifyGoogleID(body.token)
+    email = idinfo.get("email")
+    google_id = idinfo["sub"]
 
-    try:
-        idinfo = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            client_id,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired Google token",
-        )
     tenants = []
     name = ""
-    email = idinfo.get("email")
     message = ""
-    if not email:
-        raise HTTPException(
-            status_code=401,
-            detail="Google account has no email on file",
-        )
-
-    google_id = idinfo["sub"]
 
     try:
         db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
