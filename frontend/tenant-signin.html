@@ -8,7 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
-  <title>Tenant Sign Up — Golden Keys LLC</title>
+  <script src="js/config.js"></script>
+  <title>Tenant Sign In — Golden Keys LLC</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="auth-body">
@@ -22,8 +23,15 @@
     <div class="auth-card">
       <img class="logo" src="assets/logo.png" alt="Golden Keys LLC">
       <div class="rule-label">Tenant portal</div>
-      <h2>Create your account</h2>
-      <p class="auth-sub">You're joining <strong id="landlord-name">Loading...</strong>'s community. Sign up with Google to continue.</p>
+      <h2>Welcome back</h2>
+      <p class="auth-sub">New here? Enter the community code from your landlord to sign up.</p>
+
+      <form id="codeForm">
+        <input type="text" id="code" name="code" placeholder="Enter community code" required>
+        <input type="submit" value="Verify code &amp; sign up">
+      </form>
+
+      <div class="auth-divider">or sign in</div>
 
       <div class="google-slot"><div id="googleBtn"></div></div>
 
@@ -33,8 +41,8 @@
   <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
 
   <script>
-      document.getElementById('landlord-name').textContent = sessionStorage.getItem('landlordName');
-      // Keep your handleCredentialResponse function exactly the same as before
+    
+    // Keep your handleCredentialResponse function exactly the same as before
       function handleCredentialResponse(response) {
 	  const statusEl = document.getElementById("status");
 	  statusEl.style.color = "blue";
@@ -42,14 +50,14 @@
 
 	  // The secure JWT token is inside response.credential
 	  const idToken = response.credential;
-
+	  sessionStorage.setItem("ssoToken", idToken);
 	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
-	  fetch('http://localhost:8000/api/google-sso-tenant-signup', {
+	  fetch(API_BASE + '/api/google-sso-tenant-signin', {
               method: 'POST',
               headers: {
 		  'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ token: idToken, code: sessionStorage.getItem("code") })
+              body: JSON.stringify({ token: idToken })
 	  })
 	      .then(async (res) => {
 		  const data = await res.json();
@@ -62,10 +70,12 @@
 		  statusEl.style.color = "green";
 		  statusEl.innerText = `Success: ${data.message}`;
 		  console.log("Backend Response:", data);
-		  
+		  sessionStorage.setItem("landlordName", data.landlord_name);
+		  sessionStorage.setItem("tenantName", data.tenant_name);
+		  sessionStorage.setItem("code", data.landlord_code);
 		  // Authentication successful! You can now store the profile/token or redirect:
 		  // localStorage.setItem("token", data.token);
-		  // window.location.href = "/dashboard.html";
+		  window.location.href = "/tenant-dashboard.html";
 	      })
 	      .catch((error) => {
 		  statusEl.style.color = "red";
@@ -79,7 +89,7 @@
 	  const statusEl = document.getElementById("status");
 
 	  // 1. Fetch the public config from your FastAPI backend
-	  fetch('http://localhost:8000/api/config')
+	  fetch(API_BASE + '/api/config')
               .then((res) => {
 		  if (!res.ok) throw new Error("Failed to load server configuration");
 		  return res.json();
@@ -104,7 +114,53 @@
 		  statusEl.innerText = `Configuration Error: ${err.message}`;
 		  console.error(err);
               });
-      };    
-    </script>
+      };
+    
+    // Handle the code verification form submission
+    document.getElementById("codeForm").addEventListener("submit", function(e) {
+        e.preventDefault(); // Stop the page from reloading on submit
+
+        const codeInput = document.getElementById("code").value.trim();
+        const statusEl = document.getElementById("status");
+
+        if (!codeInput) {
+            statusEl.style.color = "red";
+            statusEl.innerText = "Please enter a code.";
+            return;
+        }
+
+        statusEl.style.color = "blue";
+        statusEl.innerText = "Verifying code with server...";
+
+        // Send the code to the FastAPI backend
+        fetch(API_BASE + '/api/verify-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ code: codeInput })
+        })
+        .then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Verification failed');
+            }
+            return data;
+        })
+        .then((data) => {
+            statusEl.style.color = "green";
+            statusEl.innerText = `Success! Landlord Found: ${data.landlord_name}`;
+            console.log("Server response:", data);
+	    sessionStorage.setItem("code", codeInput);
+	    sessionStorage.setItem("landlordName", data.landlord_name);
+	    window.location.href = "tenant-signup.html";
+        })
+        .catch((error) => {
+            statusEl.style.color = "red";
+            statusEl.innerText = `Error: ${error.message}`;
+            console.error("Verification Error:", error);
+        });
+    });
+  </script>
 </body>
 </html>
