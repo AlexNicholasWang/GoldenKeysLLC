@@ -67,6 +67,46 @@ def user_is_onboarded(user) -> bool:
     return user.get("onboarded", False)
 # 3. Define your router and endpoints
 router = APIRouter(prefix="/api", tags=["Authentication"])
+class TicketEditBody(BaseModel):
+    ssoToken: str
+    tenantEmail: str
+    ticketID: str
+    status: str
+    landlordNotes: str
+@router.post("/edit-ticket")
+def edit_ticket(body: TicketEditBody):
+    idinfo = verifyGoogleID(body.ssoToken)
+    email = idinfo.get("email", "").strip().lower()
+    # gemini for the win
+    filter_query = {
+        "email": email
+    }
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        update_query = {
+            "$set": {
+                "tenants.$[t].tickets.$[tk].status": body.status,
+                "tenants.$[t].tickets.$[tk].landlord-notes": body.landlordNotes
+            }
+        }
+        array_filters = [
+            {"t.email": body.tenantEmail},
+            {"tk.ticket-id": body.ticketID}
+        ]
+        result = db.landlords.update_one(
+            filter_query,
+            update_query,
+            array_filters=array_filters
+        )
+
+        if result.matched_count > 0 and result.modified_count > 0:
+            return {"success": True, "message": "Ticket updated successfully."}
+        elif result.matched_count > 0:
+            return {"success": True, "message": "Document matched, but no changes were needed."}
+        else:
+            return {"success": False, "message": "Landlord, tenant, or ticket not found."}
+    except Exception as exc:
+        return {"success": False, "message": f"ERROR: {exc}"}
 class TicketCreateBody(BaseModel):
     ssoToken: str
     code: str
