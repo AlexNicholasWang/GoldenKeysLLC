@@ -72,6 +72,7 @@ class TicketCreateBody(BaseModel):
     ticketType: str
     dateCreated: str
     notes: str
+    urgency: str
 @router.post("/create-ticket")
 def create_ticket(body: TicketCreateBody):
     """
@@ -88,6 +89,7 @@ def create_ticket(body: TicketCreateBody):
             "date-created": body.dateCreated,
             "notes": body.notes,
             "status": "Incomplete",
+            "ugency": body.urgency,
         }
         result = db.landlords.update_one(
             {
