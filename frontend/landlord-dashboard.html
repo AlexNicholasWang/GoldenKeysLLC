@@ -77,6 +77,7 @@
         <table class="data-table">
           <thead>
             <tr>
+              <th>Ticket ID</th>
               <th>Tenant Name</th>
               <th>Email</th>
               <th>Category</th>
@@ -87,7 +88,7 @@
             </tr>
           </thead>
           <tbody id="landlord-tickets-list">
-            <tr><td colspan="7" style="text-align: center;">No tickets found.</td></tr>
+            <tr><td colspan="8" style="text-align: center;">No tickets found.</td></tr>
           </tbody>
         </table>
       </div>
@@ -121,7 +122,7 @@
       tbody.innerHTML = "";
 
       if (!allTicketsData || allTicketsData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No tickets found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No tickets found.</td></tr>';
         return;
       }
 
@@ -144,6 +145,9 @@
       sortedTickets.forEach(ticket => {
         const tr = document.createElement("tr");
 
+        const tdId = document.createElement("td");
+        tdId.textContent = ticket.ticketId;
+
         const tdName = document.createElement("td");
         tdName.textContent = ticket.tenantName;
 
@@ -165,6 +169,7 @@
         const tdNotes = document.createElement("td");
         tdNotes.textContent = ticket.notes;
 
+        tr.appendChild(tdId);
         tr.appendChild(tdName);
         tr.appendChild(tdEmail);
         tr.appendChild(tdCategory);
@@ -208,12 +213,12 @@
         allTicketsData = [];
 
         tenants.forEach(tenant => {
-          // Flatten tickets from all tenants for the landlord's tickets tab
           const tenantName = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.email || "Unknown Tenant";
           const tenantTickets = tenant.tickets || [];
 
           tenantTickets.forEach(ticket => {
             allTicketsData.push({
+              ticketId: ticket["ticket-id"] || ticket.ticket_id || "",
               tenantName: tenantName,
               tenantEmail: tenant.email || "",
               category: ticket["ticket-type"] || ticket.ticketType || "",
@@ -286,7 +291,6 @@
             statusSpan.textContent = "Saving...";
             statusSpan.className = "status-msg";
 
-            // Construct payload matching TenantChangeBody schema
             const payload = {
               ssoToken: token,
               tenantEmail: tenant.email,
@@ -296,7 +300,6 @@
               date: inputDate.value
             };
 
-            // Send request to your FastAPI / backend endpoint
             fetch(API_BASE + "/api/change-tenant-info", {
               method: "POST",
               headers: {
@@ -307,7 +310,6 @@
             .then(async response => {
               const resData = await response.json();
               if (!response.ok) {
-                // Throws backend error message or default fallback
                 throw new Error(resData.detail || resData.message || "Failed to update tenant.");
               }
               return resData;

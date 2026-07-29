@@ -8,6 +8,7 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 from pathlib import Path
 import random
+import uuid
 
 current_dir = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=current_dir / ".env")
@@ -84,7 +85,9 @@ def create_ticket(body: TicketCreateBody):
     code = body.code.strip()
     try:
         db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        ticket_id = f"TKT-{uuid.uuid4().hex[:6].upper()}"
         toInsert = {
+            "ticket-id": ticket_id,
             "ticket-type": body.ticketType,
             "date-created": body.dateCreated,
             "notes": body.notes,

@@ -106,6 +106,7 @@
         <table class="data-table">
           <thead>
             <tr>
+              <th>Ticket ID</th>
               <th>Category</th>
               <th>Urgency</th>
               <th>Status</th>
@@ -114,7 +115,7 @@
             </tr>
           </thead>
           <tbody id="ticketsList">
-            <tr><td colspan="5" style="text-align: center;">No tickets submitted yet.</td></tr>
+            <tr><td colspan="6" style="text-align: center;">No tickets submitted yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -203,12 +204,15 @@
       tbody.innerHTML = "";
 
       if (!tickets || tickets.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No tickets submitted yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No tickets submitted yet.</td></tr>';
         return;
       }
 
       tickets.forEach(ticket => {
         const tr = document.createElement("tr");
+
+        const tdId = document.createElement("td");
+        tdId.textContent = ticket["ticket-id"] || ticket.ticket_id || "";
 
         const tdCategory = document.createElement("td");
         tdCategory.textContent = ticket["ticket-type"] || ticket.ticketType || "";
@@ -225,6 +229,7 @@
         const tdNotes = document.createElement("td");
         tdNotes.textContent = ticket.notes || "";
 
+        tr.appendChild(tdId);
         tr.appendChild(tdCategory);
         tr.appendChild(tdUrgency);
         tr.appendChild(tdStatus);
@@ -236,59 +241,59 @@
     }
 
     async function handleCreateTicket(event) {
-	event.preventDefault();
-	const ticketStatus = document.getElementById("ticketStatus");
-	const ssoToken = sessionStorage.getItem("ssoToken");
-	const code = sessionStorage.getItem("code");
+      event.preventDefault();
+      const ticketStatus = document.getElementById("ticketStatus");
+      const ssoToken = sessionStorage.getItem("ssoToken");
+      const code = sessionStorage.getItem("code");
 
-	if (!ssoToken || !code) {
-	  ticketStatus.textContent = "Error: Missing authentication details.";
-	  ticketStatus.className = "status-msg status-error";
-	  return;
-	}
+      if (!ssoToken || !code) {
+        ticketStatus.textContent = "Error: Missing authentication details.";
+        ticketStatus.className = "status-msg status-error";
+        return;
+      }
 
-	const ticketType = document.getElementById("ticketType").value;
-	const urgency = document.getElementById("urgency").value;
-	const notes = document.getElementById("notes").value;
+      const ticketType = document.getElementById("ticketType").value;
+      const urgency = document.getElementById("urgency").value;
+      const notes = document.getElementById("notes").value;
+      
+      // Get current date in US Eastern Time (YYYY-MM-DD)
+      const dateCreated = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
-	// ─── Get current date in US Eastern Time (YYYY-MM-DD) ───
-	const dateCreated = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+      ticketStatus.textContent = "Submitting ticket...";
+      ticketStatus.className = "status-msg";
 
-	ticketStatus.textContent = "Submitting ticket...";
-	ticketStatus.className = "status-msg";
+      try {
+        const response = await fetch(API_BASE + "/api/create-ticket", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ssoToken: ssoToken,
+            code: code,
+            ticketType: ticketType,
+            dateCreated: dateCreated,
+            notes: notes,
+            urgency: urgency
+          })
+        });
 
-	try {
-	  const response = await fetch(API_BASE + "/api/create-ticket", {
-	    method: "POST",
-	    headers: {
-	      "Content-Type": "application/json"
-	    },
-	    body: JSON.stringify({
-	      ssoToken: ssoToken,
-	      code: code,
-	      ticketType: ticketType,
-	      dateCreated: dateCreated,
-	      notes: notes,
-	      urgency: urgency
-	    })
-	  });
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.detail || "Failed to create ticket.");
+        }
 
-	  const resData = await response.json();
-	  if (!response.ok) {
-	    throw new Error(resData.detail || "Failed to create ticket.");
-	  }
+        ticketStatus.textContent = "Ticket successfully created!";
+        ticketStatus.className = "status-msg status-success";
+        document.getElementById("createTicketForm").reset();
 
-	  ticketStatus.textContent = "Ticket successfully created!";
-	  ticketStatus.className = "status-msg status-success";
-	  document.getElementById("createTicketForm").reset();
-
-	  // Refresh ticket list
-	  fetchTenantData();
-	} catch (err) {
-	  ticketStatus.textContent = err.message || "Error creating ticket.";
-	  ticketStatus.className = "status-msg status-error";
-	}
-  }
+        // Refresh ticket list
+        fetchTenantData();
+      } catch (err) {
+        ticketStatus.textContent = err.message || "Error creating ticket.";
+        ticketStatus.className = "status-msg status-error";
+      }
+    }
   </script>
 </body>
 </html>
