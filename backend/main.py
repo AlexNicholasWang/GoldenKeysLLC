@@ -11,10 +11,8 @@ import random
 
 current_dir = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=current_dir / ".env")
-
 # 1. Initialize the core FastAPI application
 app = FastAPI()
-
 # 2. Configure CORS middleware 
 # Since your frontend is in a separate folder, it will run on a different port (e.g., 5500 via VS Code Live Server)
 app.add_middleware(
@@ -28,13 +26,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 def _google_client_id() -> str:
     return (
         os.environ.get("GOOGLE_CLIENT_ID", "").strip()
         or os.environ.get("VITE_GOOGLE_CLIENT_ID", "").strip()
     )
-
 def verifyGoogleID(token: str) -> dict:
     """
     Verify Google ID token and return token payload.
@@ -48,7 +44,6 @@ def verifyGoogleID(token: str) -> dict:
                 "(same OAuth 2.0 Web client ID from Google Cloud Console)."
             ),
         )
-
     try:
         idinfo = id_token.verify_oauth2_token(
             token,
@@ -60,7 +55,6 @@ def verifyGoogleID(token: str) -> dict:
             status_code=401,
             detail="Invalid or expired Google token",
         )
-
     email = idinfo.get("email")
     if not email:
         raise HTTPException(
@@ -68,14 +62,12 @@ def verifyGoogleID(token: str) -> dict:
             detail="Google account has no email on file",
         )
     return idinfo
-
 # Placeholder helper function (ensure this is defined or imported in your actual code)
 def user_is_onboarded(user) -> bool:
     return user.get("onboarded", False)
-
 # 3. Define your router and endpoints
 router = APIRouter(prefix="/api", tags=["Authentication"])
-
+class
 class TenantChangeBody(BaseModel):
     ssoToken: str
     tenantEmail: str
@@ -83,7 +75,6 @@ class TenantChangeBody(BaseModel):
     rent: float
     day: int
     date: str
-
 @router.post("/change-tenant-info")
 def change_tenant_info(body: TenantChangeBody):
     """
@@ -91,7 +82,6 @@ def change_tenant_info(body: TenantChangeBody):
     """
     idinfo = verifyGoogleID(body.ssoToken)
     email = idinfo.get("email")
-
     try:
         db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
         user = db.landlords.find_one({"email": email})
@@ -117,14 +107,11 @@ def change_tenant_info(body: TenantChangeBody):
             detail=f"Database error during sign-in: {exc}",
         ) from exc
     return message
-
 class GoogleTokenBody(BaseModel):
     token: str
-
 class TenantDataRequestBody(BaseModel):
     code: str
     token: str
-
 @router.post("/get-tenant-data")
 def get_tenant_data(body: TenantDataRequestBody):
     """
@@ -240,14 +227,10 @@ def google_sso_landlord(body: GoogleTokenBody):
 
 # 4. Register the router onto the main app instance
 app.include_router(router)
-
 router = APIRouter(prefix="/api", tags=[])
-
 router = APIRouter(prefix="/api", tags=["Authentication"])
-
 class GoogleTokenBody(BaseModel):
     token: str
-
 @app.get("/api/config")
 def get_config():
     """
@@ -258,7 +241,6 @@ def get_config():
         raise HTTPException(status_code=500, detail="Google Client ID not configured on server")
     
     return {"google_client_id": client_id}
-
 @router.post("/google-sso-landlord")
 def google_sso_landlord(body: GoogleTokenBody):
     """
@@ -312,7 +294,6 @@ def google_sso_landlord(body: GoogleTokenBody):
             status_code=503,
             detail=f"Database error during sign-in: {exc}",
         ) from exc
-
     profile = user.get("local_storage", []) if (onboarded and user) else None
     return {
         "message": message,
@@ -321,10 +302,8 @@ def google_sso_landlord(body: GoogleTokenBody):
         "token": body.token,
         "profile": profile,
     }
-
 class VerifyCodeBody(BaseModel):
     code: str
-
 @app.post("/api/verify-code")
 def verify_code(body: VerifyCodeBody):
     search_code = body.code.strip()
@@ -350,11 +329,9 @@ def verify_code(body: VerifyCodeBody):
             status_code=503,
             detail=f"Database error during code validation: {exc}",
         ) from exc
-
 class TenantSignupBody(BaseModel):
     token: str
     code: str
-
 @router.post("/google-sso-tenant-signup")
 def google_sso_tenant_signup(body: TenantSignupBody):
     """
@@ -363,10 +340,8 @@ def google_sso_tenant_signup(body: TenantSignupBody):
     idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
     google_id = idinfo["sub"]
-
     try:
-        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-        
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]   
         # Fixed the database collection mismatch here (using 'users' consistently)
         landlords = db.landlords.find()
         for landlord in landlords:
@@ -400,7 +375,6 @@ def google_sso_tenant_signup(body: TenantSignupBody):
             status_code=503,
             detail=f"Database error during sign-in: {exc}",
         ) from exc
-
     profile = landlord.get("local_storage", []) if (onboarded and landlord) else None
     return {
         "message": message,
@@ -409,7 +383,6 @@ def google_sso_tenant_signup(body: TenantSignupBody):
         "token": body.token,
         "profile": profile,
     }
-
 @router.post("/google-sso-tenant-signin")
 def google_sso_tenant_signin(body: GoogleTokenBody):
     """
@@ -418,14 +391,12 @@ def google_sso_tenant_signin(body: GoogleTokenBody):
     idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
     google_id = idinfo["sub"]
-
     landlord_name = ""
     tenant_name = ""
     landlord_code = ""
     doesTenantExist = False
     try:
-        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-        
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]    
         # Fixed the database collection mismatch here (using 'users' consistently)
         landlords = db.landlords.find()
         for landlord in landlords:
@@ -451,7 +422,6 @@ def google_sso_tenant_signin(body: GoogleTokenBody):
         "landlord_code": landlord_code,
         "token": body.token,
     }
-
 @router.post("/get-landlord-data")
 def get_landlord_data(body: GoogleTokenBody):
     """
@@ -460,14 +430,11 @@ def get_landlord_data(body: GoogleTokenBody):
     idinfo = verifyGoogleID(body.token)
     email = idinfo.get("email")
     google_id = idinfo["sub"]
-
     tenants = []
     name = ""
     message = ""
-
     try:
-        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-        
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]      
         # Fixed the database collection mismatch here (using 'users' consistently)
         user = db.landlords.find_one({"email": email})
         if user is None:
@@ -478,14 +445,12 @@ def get_landlord_data(body: GoogleTokenBody):
             code = user.get("code")
             tenants = user.get("tenants")
             message = f"Welcome back {name}"
-
         onboarded = user_is_onboarded(user)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail=f"Database error during sign-in: {exc}",
         ) from exc
-
     profile = user.get("local_storage", []) if (onboarded and user) else None
     return {
         "message": message,
@@ -496,9 +461,5 @@ def get_landlord_data(body: GoogleTokenBody):
         "token": body.token,
         "profile": profile,
     }
-
-
 # 4. Register the router onto the main app instance
-
-
 app.include_router(router)
