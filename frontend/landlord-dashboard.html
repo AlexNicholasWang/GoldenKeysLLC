@@ -10,6 +10,66 @@
   <link rel="stylesheet" href="css/styles.css">
   <script src="js/config.js"></script>
   <title>Landlord Dashboard — Golden Keys LLC</title>
+  <style>
+    /* Expand main dashboard container width */
+    .app-main {
+      max-width: 96vw !important;
+      width: 96% !important;
+      margin: 0 auto;
+    }
+
+    /* Make tables compact and force fit within the viewport */
+    .data-table {
+      width: 100%;
+      font-size: 0.83rem;
+      border-collapse: collapse;
+      table-layout: auto;
+    }
+
+    .data-table th, 
+    .data-table td {
+      padding: 6px 8px !important;
+      text-align: left;
+      vertical-align: middle;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    /* Compact inputs, selects, and buttons inside table cells */
+    .data-table input[type="text"],
+    .data-table input[type="number"],
+    .data-table select {
+      font-size: 0.82rem !important;
+      padding: 4px 6px !important;
+      max-width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .data-table button {
+      font-size: 0.8rem !important;
+      padding: 4px 8px !important;
+      cursor: pointer;
+    }
+
+    /* Constrain notes and email columns so they don't force wide scrolling */
+    .data-table td:nth-child(3) { /* Email */
+      max-width: 160px;
+    }
+    .data-table td:nth-child(8) { /* Tenant Notes */
+      max-width: 160px;
+    }
+    .data-table td:nth-child(9) { /* Landlord Notes */
+      max-width: 180px;
+    }
+
+    .status-msg {
+      font-size: 0.75rem;
+      margin-top: 2px;
+      display: block;
+    }
+  </style>
 </head>
 <body class="app-body">
 
@@ -27,32 +87,244 @@
   <main id="dashboard" class="app-main" style="display: none;">
     <div class="rule-label align-left">Landlord dashboard</div>
     <h1 id="welcome"></h1>
-    <p class="app-sub">Review and update your community's records below. Changes save per tenant.</p>
+    <p class="app-sub">Review and update your community's records below. Changes save per tenant or ticket.</p>
     <p>Your unique code is <span id="code-display">Loading...</span></p>
     <script>
       document.getElementById('code-display').textContent = sessionStorage.getItem('code');
     </script>
-    <h3>Tenants</h3>
-    <div class="panel table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Email</th>
-            <th>Address</th>
-            <th>Rent ($)</th>
-            <th>Day of Month Due</th>
-            <th>Next Due Date</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="tenants-list"></tbody>
-      </table>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav" style="display: flex; gap: 10px; margin-bottom: 24px;">
+      <button id="tabTenantsBtn" class="btn" onclick="switchLandlordTab('tenants')">Tenants</button>
+      <button id="tabTicketsBtn" class="btn btn-outline" onclick="switchLandlordTab('tickets')">All Maintenance Tickets</button>
+    </div>
+
+    <!-- Tab 1: Tenants List -->
+    <div id="tenantsTabContent">
+      <h3>Tenants</h3>
+      <div class="panel table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>First Name</th>
+              <th>Last Name</th>
+              <th>Email</th>
+              <th>Address</th>
+              <th>Rent ($)</th>
+              <th>Day of Month Due</th>
+              <th>Next Due Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="tenants-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: All Tenants Maintenance Tickets -->
+    <div id="ticketsTabContent" style="display: none;">
+      <h3>All Tickets</h3>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <label for="sortTicketsSelect" style="font-weight: 600;">Sort by:</label>
+        <select id="sortTicketsSelect" onchange="renderLandlordTickets(this.value)" style="padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="tenant">Tenant</option>
+          <option value="urgency">Urgency</option>
+          <option value="category">Category</option>
+        </select>
+      </div>
+
+      <div class="panel table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>Tenant Name</th>
+              <th>Email</th>
+              <th>Category</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th>Date Created</th>
+              <th>Tenant Notes</th>
+              <th>Landlord Notes</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="landlord-tickets-list">
+            <tr><td colspan="10" style="text-align: center;">No tickets found.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 
   <script>
+    let allTicketsData = [];
+
+    function switchLandlordTab(tab) {
+      const tenantsTab = document.getElementById("tenantsTabContent");
+      const ticketsTab = document.getElementById("ticketsTabContent");
+      const tenantsBtn = document.getElementById("tabTenantsBtn");
+      const ticketsBtn = document.getElementById("tabTicketsBtn");
+
+      if (tab === "tenants") {
+        tenantsTab.style.display = "block";
+        ticketsTab.style.display = "none";
+        tenantsBtn.className = "btn";
+        ticketsBtn.className = "btn btn-outline";
+      } else {
+        tenantsTab.style.display = "none";
+        ticketsTab.style.display = "block";
+        tenantsBtn.className = "btn btn-outline";
+        ticketsBtn.className = "btn";
+      }
+    }
+
+    function renderLandlordTickets(sortBy = "tenant") {
+      const tbody = document.getElementById("landlord-tickets-list");
+      tbody.innerHTML = "";
+
+      if (!allTicketsData || allTicketsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No tickets found.</td></tr>';
+        return;
+      }
+
+      const sortedTickets = [...allTicketsData];
+
+      if (sortBy === "tenant") {
+        sortedTickets.sort((a, b) => a.tenantName.localeCompare(b.tenantName));
+      } else if (sortBy === "urgency") {
+        const urgencyRank = { "ASAP": 1, "Somewhat Urgent": 2, "Not urgent": 3 };
+        sortedTickets.sort((a, b) => {
+          const rankA = urgencyRank[a.urgency] || 99;
+          const rankB = urgencyRank[b.urgency] || 99;
+          if (rankA !== rankB) return rankA - rankB;
+          return a.urgency.localeCompare(b.urgency);
+        });
+      } else if (sortBy === "category") {
+        sortedTickets.sort((a, b) => a.category.localeCompare(b.category));
+      }
+
+      sortedTickets.forEach(ticket => {
+        const tr = document.createElement("tr");
+
+        const tdId = document.createElement("td");
+        tdId.textContent = ticket.ticketId;
+
+        const tdName = document.createElement("td");
+        tdName.textContent = ticket.tenantName;
+
+        const tdEmail = document.createElement("td");
+        tdEmail.textContent = ticket.tenantEmail;
+
+        const tdCategory = document.createElement("td");
+        tdCategory.textContent = ticket.category;
+
+        const tdUrgency = document.createElement("td");
+        tdUrgency.textContent = ticket.urgency;
+
+        // Editable Status Dropdown
+        const tdStatus = document.createElement("td");
+        const selectStatus = document.createElement("select");
+
+        const statuses = ["Incomplete", "In Progress", "Complete"];
+        statuses.forEach(statusOpt => {
+          const opt = document.createElement("option");
+          opt.value = statusOpt;
+          opt.textContent = statusOpt;
+          if ((ticket.status || "").toLowerCase() === statusOpt.toLowerCase()) {
+            opt.selected = true;
+          }
+          selectStatus.appendChild(opt);
+        });
+        tdStatus.appendChild(selectStatus);
+
+        const tdDate = document.createElement("td");
+        tdDate.textContent = ticket.dateCreated;
+
+        const tdTenantNotes = document.createElement("td");
+        tdTenantNotes.textContent = ticket.tenantNotes;
+
+        // Editable Landlord Notes Input
+        const tdLandlordNotes = document.createElement("td");
+        const inputLandlordNotes = document.createElement("input");
+        inputLandlordNotes.type = "text";
+        inputLandlordNotes.value = ticket.landlordNotes || "";
+        inputLandlordNotes.placeholder = "Add notes...";
+        tdLandlordNotes.appendChild(inputLandlordNotes);
+
+        // Action Submit Button & Status Message
+        const tdAction = document.createElement("td");
+        const btnSave = document.createElement("button");
+        btnSave.className = "btn";
+        btnSave.textContent = "Save";
+        
+        const statusSpan = document.createElement("span");
+        statusSpan.className = "status-msg";
+
+        btnSave.onclick = function() {
+          const token = sessionStorage.getItem("googleToken");
+          const code = sessionStorage.getItem("code");
+
+          statusSpan.textContent = "Saving...";
+          statusSpan.className = "status-msg";
+
+          const payload = {
+            ssoToken: token,
+            code: code,
+            tenantEmail: ticket.tenantEmail,
+            ticketID: ticket.ticketId,
+            status: selectStatus.value,
+            landlordNotes: inputLandlordNotes.value
+          };
+
+          fetch(API_BASE + "/api/edit-ticket", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          })
+          .then(async response => {
+            const resData = await response.json();
+            if (!response.ok) {
+              throw new Error(resData.detail || resData.message || "Failed to update ticket.");
+            }
+            return resData;
+          })
+          .then(resData => {
+            if (resData.success !== false) {
+              statusSpan.textContent = resData.message || "Saved!";
+              statusSpan.className = "status-msg status-success";
+              ticket.status = selectStatus.value;
+              ticket.landlordNotes = inputLandlordNotes.value;
+            } else {
+              throw new Error(resData.message || "Update failed.");
+            }
+          })
+          .catch(err => {
+            statusSpan.textContent = err.message || "Error updating ticket.";
+            statusSpan.className = "status-msg status-error";
+          });
+        };
+
+        tdAction.appendChild(btnSave);
+        tdAction.appendChild(statusSpan);
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdName);
+        tr.appendChild(tdEmail);
+        tr.appendChild(tdCategory);
+        tr.appendChild(tdUrgency);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTenantNotes);
+        tr.appendChild(tdLandlordNotes);
+        tr.appendChild(tdAction);
+
+        tbody.appendChild(tr);
+      });
+    }
+
     window.onload = function() {
       const token = sessionStorage.getItem("googleToken");
       
@@ -81,20 +353,39 @@
         tbody.innerHTML = "";
         
         const tenants = data.tenants || [];
+        allTicketsData = [];
+
         tenants.forEach(tenant => {
+          const tenantName = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.email || "Unknown Tenant";
+          const tenantTickets = tenant.tickets || [];
+
+          tenantTickets.forEach(ticket => {
+            allTicketsData.push({
+              ticketId: ticket["ticket-id"] || ticket.ticket_id || "",
+              tenantName: tenantName,
+              tenantEmail: tenant.email || "",
+              category: ticket["ticket-type"] || ticket.ticketType || "",
+              urgency: ticket["ugency"] || ticket.urgency || "",
+              status: ticket.status || "Incomplete",
+              dateCreated: ticket["date-created"] || ticket.dateCreated || "",
+              tenantNotes: ticket["tenant-notes"] || ticket.notes || "",
+              landlordNotes: ticket["landlord-notes"] || ticket.landlordNotes || ""
+            });
+          });
+
           const tr = document.createElement("tr");
           
-          // First Name (Read-only)
+          // First Name
           const tdFirst = document.createElement("td");
           tdFirst.textContent = tenant.first_name || "";
           tr.appendChild(tdFirst);
           
-          // Last Name (Read-only)
+          // Last Name
           const tdLast = document.createElement("td");
           tdLast.textContent = tenant.last_name || "";
           tr.appendChild(tdLast);
           
-          // Email (Read-only)
+          // Email
           const tdEmail = document.createElement("td");
           tdEmail.textContent = tenant.email || "";
           tr.appendChild(tdEmail);
@@ -107,7 +398,7 @@
           tdAddress.appendChild(inputAddress);
           tr.appendChild(tdAddress);
 
-          // Editable Rent (Float)
+          // Editable Rent
           const tdRent = document.createElement("td");
           const inputRent = document.createElement("input");
           inputRent.type = "number";
@@ -116,7 +407,7 @@
           tdRent.appendChild(inputRent);
           tr.appendChild(tdRent);
 
-          // Editable Day (Int)
+          // Editable Day
           const tdDay = document.createElement("td");
           const inputDay = document.createElement("input");
           inputDay.type = "number";
@@ -135,6 +426,7 @@
           // Submit Action & Feedback Status
           const tdAction = document.createElement("td");
           const btnSubmit = document.createElement("button");
+          btnSubmit.className = "btn";
           btnSubmit.textContent = "Save";
           
           const statusSpan = document.createElement("span");
@@ -144,7 +436,6 @@
             statusSpan.textContent = "Saving...";
             statusSpan.className = "status-msg";
 
-            // Construct payload matching TenantChangeBody schema
             const payload = {
               ssoToken: token,
               tenantEmail: tenant.email,
@@ -154,7 +445,6 @@
               date: inputDate.value
             };
 
-            // Send request to your FastAPI / backend endpoint
             fetch(API_BASE + "/api/change-tenant-info", {
               method: "POST",
               headers: {
@@ -165,7 +455,6 @@
             .then(async response => {
               const resData = await response.json();
               if (!response.ok) {
-                // Throws backend error message or default fallback
                 throw new Error(resData.detail || resData.message || "Failed to update tenant.");
               }
               return resData;
@@ -187,6 +476,8 @@
           tbody.appendChild(tr);
         });
         
+        renderLandlordTickets("tenant");
+
         document.getElementById("dashboard").style.display = "block";
       })
       .catch(() => {
