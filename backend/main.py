@@ -181,12 +181,13 @@ def get_tenant_data(body: TenantDataRequestBody):
         tenants = landlord.get("tenants")
         for tenant in tenants:
             if(tenant["email"] == email):
-                first_name = tenant["first_name"]
-                last_name = tenant["last_name"]
-                address = tenant["address"]
-                date = tenant["date"]
-                day = tenant["day"]
-                rent = tenant["rent"]
+                first_name = tenant.get("fist_name")
+                last_name = tenant.get("last_name")
+                address = tenant.get("address")
+                date = tenant.get("date")
+                day = tenant.get("day")
+                rent = tenant.get("rent")
+                tickets = tenant.get("tickets")
                 message = "Success"
                 return {
                     "message": message,
@@ -197,6 +198,7 @@ def get_tenant_data(body: TenantDataRequestBody):
                     "date": date,
                     "day": day,
                     "rent": rent,
+                    "tickets": tickets,
                 }
         raise HTTPException(
                 status_code=404, 
