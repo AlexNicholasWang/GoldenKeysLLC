@@ -28,7 +28,10 @@
     <div class="rule-label align-left">Landlord dashboard</div>
     <h1 id="welcome"></h1>
     <p class="app-sub">Review and update your community's records below. Changes save per tenant.</p>
-
+    <p>Your unique code is <span id="code-display">Loading...</span></p>
+    <script>
+      document.getElementById('code-display').textContent = sessionStorage.getItem('code');
+    </script>
     <h3>Tenants</h3>
     <div class="panel table-wrap">
       <table class="data-table">
