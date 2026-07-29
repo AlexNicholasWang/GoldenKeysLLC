@@ -84,15 +84,15 @@ def create_ticket(body: TicketCreateBody):
     email = idinfo.get("email", "").strip().lower()
     code = body.code.strip()
     try:
-        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
         ticket_id = f"TKT-{uuid.uuid4().hex[:6].upper()}"
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
         toInsert = {
-            "ticket-id": ticket_id,
             "ticket-type": body.ticketType,
             "date-created": body.dateCreated,
             "notes": body.notes,
             "status": "Incomplete",
             "ugency": body.urgency,
+            "ticket-id": ticket_id,
         }
         result = db.landlords.update_one(
             {
