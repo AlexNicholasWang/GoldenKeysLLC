@@ -62,12 +62,59 @@ def verifyGoogleID(token: str) -> dict:
             detail="Google account has no email on file",
         )
     return idinfo
-# Placeholder helper function (ensure this is defined or imported in your actual code)
 def user_is_onboarded(user) -> bool:
     return user.get("onboarded", False)
 # 3. Define your router and endpoints
 router = APIRouter(prefix="/api", tags=["Authentication"])
-class
+class TicketCreateBody(BaseModel):
+    ssoToken: str
+    code: str
+    ticketType: str
+    dateCreated: str
+    notes: str
+@router.post("/create-ticket")
+def create_ticket(body: TicketCreateBody):
+    """
+    Verify Google ID token and prepend a ticket to the matching tenant's ticket list.
+    """
+    # gemini clutched up on this one
+    idinfo = verifyGoogleID(body.ssoToken)
+    email = idinfo.get("email", "").strip().lower()
+    code = body.code.strip()
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        toInsert = {
+            "ticket-type": body.ticketType,
+            "date-created": body.dateCreated,
+            "notes": body.notes,
+        }
+        result = db.landlords.update_one(
+            {
+                "code": code, 
+                "tenants.email": email
+            },
+            {
+                "$push": {
+                    "tenants.$.tickets": {
+                        "$each": [toInsert],
+                        "$position": 0
+                    }
+                }
+            }
+        )
+        if result.matched_count == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No tenant account found with email '{email}' under landlord code '{code}'."
+            )
+        return "Ticket Successfully Created"
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Something went wrong: {exc}",
+        ) from exc
 class TenantChangeBody(BaseModel):
     ssoToken: str
     tenantEmail: str
