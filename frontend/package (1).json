@@ -1,41 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Keyfolio Landlord Dashboard</title>
-  <style>
-    .status-msg {
-      font-size: 0.85em;
-      margin-left: 8px;
-      font-weight: bold;
-    }
-    .status-success { color: green; }
-    .status-error { color: red; }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <title>Landlord Dashboard — Golden Keys LLC</title>
 </head>
-<body>
+<body class="app-body">
 
-  <div id="error" style="display: none;">Authentication failed. Try to sign in again.</div>
-  <div id="dashboard" style="display: none;">
-    <h1 id="welcome"></h1>
-    <a href="index.html">Go Home</a>
-    <br><br>
-    <h3>Tenants</h3>
-    <table border="1" cellpadding="6" cellspacing="0">
-      <thead>
-        <tr>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>Email</th>
-          <th>Address</th>
-          <th>Rent ($)</th>
-          <th>Day of Month Due</th>
-          <th>Next Due Date</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="tenants-list"></tbody>
-    </table>
+  <div class="app-bar">
+    <a class="brand" href="index.html">
+      <img src="assets/logo.png" alt="Golden Keys LLC logo" style="height:38px">
+      <span class="brand-name">Golden Keys<small>Landlord</small></span>
+    </a>
+    <div class="spacer"></div>
+    <a class="btn btn-outline" href="index.html">Go Home</a>
   </div>
+
+  <div id="error" class="alert-error" style="display: none;">Authentication failed. Try to sign in again.</div>
+
+  <main id="dashboard" class="app-main" style="display: none;">
+    <div class="rule-label align-left">Landlord dashboard</div>
+    <h1 id="welcome"></h1>
+    <p class="app-sub">Review and update your community's records below. Changes save per tenant.</p>
+
+    <h3>Tenants</h3>
+    <div class="panel table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Email</th>
+            <th>Address</th>
+            <th>Rent ($)</th>
+            <th>Day of Month Due</th>
+            <th>Next Due Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tenants-list"></tbody>
+      </table>
+    </div>
+  </main>
 
   <script>
     window.onload = function() {

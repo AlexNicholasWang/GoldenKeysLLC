@@ -1,20 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keyfolio Tenant Signup</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <title>Tenant Sign Up — Golden Keys LLC</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body>
-  <h2>Keyfolio Tenant Signup</h2>
-  <a href="index.html">Go Home</a>
-  <p>Sign Up for <span id="landlord-name">Loading...</span>'s Community</p>
-        
-  <div id="googleBtn"></div>
-        
-  <p id="status" style="margin-top: 20px; color: gray;"></p>
-    <script>
+<body class="auth-body">
+  <div class="auth-topbar">
+    <a class="brand" href="index.html">
+      <img src="assets/logo.png" alt="Golden Keys LLC logo" style="height:40px">
+      <span class="brand-name">Golden Keys<small>Keyfolio</small></span>
+    </a>
+  </div>
+  <main class="auth-main">
+    <div class="auth-card">
+      <img class="logo" src="assets/logo.png" alt="Golden Keys LLC">
+      <div class="rule-label">Tenant portal</div>
+      <h2>Create your account</h2>
+      <p class="auth-sub">You're joining <strong id="landlord-name">Loading...</strong>'s community. Sign up with Google to continue.</p>
+
+      <div class="google-slot"><div id="googleBtn"></div></div>
+
+      <p id="status" class="status-line"></p>
+    </div>
+  </main>
+  <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
+
+  <script>
       document.getElementById('landlord-name').textContent = sessionStorage.getItem('landlordName');
       // Keep your handleCredentialResponse function exactly the same as before
       function handleCredentialResponse(response) {

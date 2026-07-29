@@ -1,27 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keyfolio Tenant Signin</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <title>Tenant Sign In — Golden Keys LLC</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body>
-  <h2>Keyfolio Tenant Signin</h2>
-  <a href="index.html">Go Home</a>
-  <p>Enter Code to Sign Up</p>
-  
-  <form id="codeForm">
-    <input type="text" id="code" name="code" placeholder="Enter Code Here" required><br><br>
-    <input type="submit" value="Submit">
-  </form>
-  
-  <p id="status" style="margin-top: 20px; color: gray; font-family: Arial, sans-serif;"></p>
+<body class="auth-body">
+  <div class="auth-topbar">
+    <a class="brand" href="index.html">
+      <img src="assets/logo.png" alt="Golden Keys LLC logo" style="height:40px">
+      <span class="brand-name">Golden Keys<small>Keyfolio</small></span>
+    </a>
+  </div>
+  <main class="auth-main">
+    <div class="auth-card">
+      <img class="logo" src="assets/logo.png" alt="Golden Keys LLC">
+      <div class="rule-label">Tenant portal</div>
+      <h2>Welcome back</h2>
+      <p class="auth-sub">New here? Enter the community code from your landlord to sign up.</p>
 
-  <p>or Sign In</p>
+      <form id="codeForm">
+        <input type="text" id="code" name="code" placeholder="Enter community code" required>
+        <input type="submit" value="Verify code &amp; sign up">
+      </form>
 
-  <div id="googleBtn"></div>
-  
+      <div class="auth-divider">or sign in</div>
+
+      <div class="google-slot"><div id="googleBtn"></div></div>
+
+      <p id="status" class="status-line"></p>
+    </div>
+  </main>
+  <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
+
   <script>
     
     // Keep your handleCredentialResponse function exactly the same as before
