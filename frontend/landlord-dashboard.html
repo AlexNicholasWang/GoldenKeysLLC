@@ -7,6 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Flatpickr Date Picker CSS & Theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
   <link rel="stylesheet" href="css/styles.css">
   <script src="js/config.js"></script>
   <title>Landlord Dashboard — Golden Keys LLC</title>
@@ -45,6 +50,44 @@
       box-sizing: border-box;
       border: 1px solid #ccc;
       border-radius: 4px;
+    }
+
+    /* Cool Date Picker Styling */
+    .date-picker-input {
+      background-color: #fff !important;
+      border: 1px solid #ccc !important;
+      border-radius: 4px !important;
+      padding: 4px 8px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 0.82rem !important;
+      color: #333 !important;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      width: 120px;
+    }
+
+    .date-picker-input:hover, .date-picker-input:focus {
+      border-color: #b89146 !important;
+      box-shadow: 0 0 0 2px rgba(184, 145, 70, 0.2);
+      outline: none;
+    }
+
+    /* Customizing Flatpickr Calendar Widget */
+    .flatpickr-calendar {
+      border-radius: 8px !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+      border: 1px solid #e5e7eb !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+
+    .flatpickr-day.selected, 
+    .flatpickr-day.selected:hover {
+      background: #b89146 !important;
+      border-color: #b89146 !important;
+    }
+
+    .flatpickr-day:hover {
+      background: #f4efe6 !important;
     }
 
     .data-table button {
@@ -159,6 +202,77 @@
 
   <script>
     let allTicketsData = [];
+
+    // Helper: Get Current Date in EST timezone (YYYY-MM-DD)
+    function getEstToday() {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      return formatter.format(new Date());
+    }
+
+    // Helper: Add 1 month to date, capping at last day of target month if day doesn't exist
+    function addOneMonthWithDayCap(dateStr, preferredDay) {
+      if (!dateStr) return "";
+      const parts = dateStr.split("-");
+      if (parts.length !== 3) return dateStr;
+
+      let year = parseInt(parts[0], 10);
+      let month = parseInt(parts[1], 10); // 1 - 12
+      let targetDay = (preferredDay !== undefined && preferredDay !== null && preferredDay !== "") 
+                      ? parseInt(preferredDay, 10) 
+                      : parseInt(parts[2], 10);
+
+      if (isNaN(targetDay) || targetDay < 1) targetDay = parseInt(parts[2], 10) || 1;
+
+      // Increment month
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+
+      // Determine max days in target month
+      const maxDaysInMonth = new Date(year, month, 0).getDate();
+      const actualDay = Math.min(targetDay, maxDaysInMonth);
+
+      const formattedMonth = String(month).padStart(2, '0');
+      const formattedDay = String(actualDay).padStart(2, '0');
+
+      return `${year}-${formattedMonth}-${formattedDay}`;
+    }
+
+    // Helper: Save Tenant Information
+    function saveTenantRecord(payload, statusSpan) {
+      statusSpan.textContent = "Saving...";
+      statusSpan.className = "status-msg";
+
+      fetch(API_BASE + "/api/change-tenant-info", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(async response => {
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.detail || resData.message || "Failed to update tenant.");
+        }
+        return resData;
+      })
+      .then(resData => {
+        statusSpan.textContent = resData.message || "Success!";
+        statusSpan.className = "status-msg status-success";
+      })
+      .catch(err => {
+        statusSpan.textContent = err.message || "Error updating tenant.";
+        statusSpan.className = "status-msg status-error";
+      });
+    }
 
     function switchLandlordTab(tab) {
       const tenantsTab = document.getElementById("tenantsTabContent");
@@ -354,6 +468,7 @@
         
         const tenants = data.tenants || [];
         allTicketsData = [];
+        const estToday = getEstToday(); // Get current date in EST (YYYY-MM-DD)
 
         tenants.forEach(tenant => {
           const tenantName = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.email || "Unknown Tenant";
@@ -415,13 +530,24 @@
           tdDay.appendChild(inputDay);
           tr.appendChild(tdDay);
 
-          // Editable Date
+          // Editable Date with Flatpickr UI
           const tdDate = document.createElement("td");
           const inputDate = document.createElement("input");
           inputDate.type = "text";
+          inputDate.className = "date-picker-input";
+          inputDate.placeholder = "Select date...";
           inputDate.value = tenant.date || "";
           tdDate.appendChild(inputDate);
           tr.appendChild(tdDate);
+
+          // Initialize Flatpickr UI
+          const fpInstance = flatpickr(inputDate, {
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "M j, Y",
+            altInputClass: "date-picker-input",
+            allowInput: true
+          });
 
           // Submit Action & Feedback Status
           const tdAction = document.createElement("td");
@@ -433,9 +559,6 @@
           statusSpan.className = "status-msg";
 
           btnSubmit.onclick = function() {
-            statusSpan.textContent = "Saving...";
-            statusSpan.className = "status-msg";
-
             const payload = {
               ssoToken: token,
               tenantEmail: tenant.email,
@@ -444,29 +567,7 @@
               day: parseInt(inputDay.value, 10) || 0,
               date: inputDate.value
             };
-
-            fetch(API_BASE + "/api/change-tenant-info", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify(payload)
-            })
-            .then(async response => {
-              const resData = await response.json();
-              if (!response.ok) {
-                throw new Error(resData.detail || resData.message || "Failed to update tenant.");
-              }
-              return resData;
-            })
-            .then(resData => {
-              statusSpan.textContent = resData.message || "Success!";
-              statusSpan.className = "status-msg status-success";
-            })
-            .catch(err => {
-              statusSpan.textContent = err.message || "Error updating tenant.";
-              statusSpan.className = "status-msg status-error";
-            });
+            saveTenantRecord(payload, statusSpan);
           };
 
           tdAction.appendChild(btnSubmit);
@@ -474,6 +575,31 @@
           tr.appendChild(tdAction);
           
           tbody.appendChild(tr);
+
+          // Check if tenant's due date has passed according to EST time
+          if (tenant.date && estToday > tenant.date) {
+            const displayName = tenantName;
+            const confirmUpdate = confirm(`${displayName}'s due date has past (${tenant.date}). Want to update it to one month after?`);
+            
+            if (confirmUpdate) {
+              const newDueDate = addOneMonthWithDayCap(tenant.date, inputDay.value || tenant.day);
+              
+              // Update local state and Flatpickr UI
+              tenant.date = newDueDate;
+              fpInstance.setDate(newDueDate, true);
+
+              // Auto-save the updated date to backend
+              const payload = {
+                ssoToken: token,
+                tenantEmail: tenant.email,
+                address: inputAddress.value,
+                rent: parseFloat(inputRent.value) || 0.0,
+                day: parseInt(inputDay.value, 10) || 0,
+                date: newDueDate
+              };
+              saveTenantRecord(payload, statusSpan);
+            }
+          }
         });
         
         renderLandlordTickets("tenant");
