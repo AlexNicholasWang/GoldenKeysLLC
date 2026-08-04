@@ -78,36 +78,79 @@
 	      });
       }
 
-      // Update the window.onload logic to dynamically fetch the config
+      // Update window.onload logic to check for stored googleToken first
       window.onload = function () {
 	  const statusEl = document.getElementById("status");
+	  const googleToken = sessionStorage.getItem("googleToken") || sessionStorage.getItem("ssoToken");
 
-	  // 1. Fetch the public config from your FastAPI backend
-	  fetch(API_BASE + '/api/config')
-              .then((res) => {
-		  if (!res.ok) throw new Error("Failed to load server configuration");
-		  return res.json();
-              })
-              .then((config) => {
-		  // 2. Initialize Google GSI using the dynamic ID from backend/.env
-		  google.accounts.id.initialize({
-                      client_id: config.google_client_id, // <-- Dynamic variable from server!
-                      callback: handleCredentialResponse
+	  function initGoogleSignIn() {
+	      // Fetch public config & render Google Sign-In button
+	      fetch(API_BASE + '/api/config')
+		  .then((res) => {
+		      if (!res.ok) throw new Error("Failed to load server configuration");
+		      return res.json();
+		  })
+		  .then((config) => {
+		      google.accounts.id.initialize({
+			  client_id: config.google_client_id,
+			  callback: handleCredentialResponse
+		      });
+
+		      google.accounts.id.renderButton(
+			  document.getElementById("googleBtn"),
+			  { theme: "outline", size: "large", text: "signin_with" }
+		      );
+
+		      google.accounts.id.prompt();
+		  })
+		  .catch((err) => {
+		      statusEl.style.color = "red";
+		      statusEl.innerText = `Configuration Error: ${err.message}`;
+		      console.error(err);
 		  });
+	  }
 
-		  // 3. Render the button now that Google is initialized
-		  google.accounts.id.renderButton(
-                      document.getElementById("googleBtn"),
-                      { theme: "outline", size: "large", text: "signin_with" }
-		  );
+	  if (googleToken) {
+	      statusEl.style.color = "blue";
+	      statusEl.innerText = "Verifying authentication with Keyfolio servers...";
 
-		  google.accounts.id.prompt(); // Optional One Tap
-              })
-              .catch((err) => {
-		  statusEl.style.color = "red";
-		  statusEl.innerText = `Configuration Error: ${err.message}`;
-		  console.error(err);
-              });
+	      // Directly attempt backend login with stored token
+	      fetch(API_BASE + '/api/google-sso-landlord', {
+		  method: 'POST',
+		  headers: {
+		      'Content-Type': 'application/json'
+		  },
+		  body: JSON.stringify({ token: googleToken })
+	      })
+		  .then(async (res) => {
+		      const data = await res.json();
+		      if (!res.ok) {
+			  throw new Error(data.detail || 'Authentication failed');
+		      }
+		      return data;
+		  })
+		  .then((data) => {
+		      statusEl.style.color = "green";
+		      statusEl.innerText = `Success: ${data.message}`;
+		      console.log("Backend Response:", data);
+		      sessionStorage.setItem("firstName", data.firstName);
+		      sessionStorage.setItem("lastName", data.lastName);
+		      sessionStorage.setItem("code", data.code);
+		      sessionStorage.setItem("googleToken", googleToken);
+		      window.location.href = "landlord-dashboard.html";
+		  })
+		  .catch((error) => {
+		      statusEl.style.color = "red";
+		      statusEl.innerText = `Error: ${error.message}`;
+		      console.error("SSO Error:", error);
+		      // Remove invalid token & prompt Google Sign-In
+		      sessionStorage.removeItem("googleToken");
+		      sessionStorage.removeItem("ssoToken");
+		      initGoogleSignIn();
+		  });
+	  } else {
+	      initGoogleSignIn();
+	  }
       };    
     </script>
 </body>
