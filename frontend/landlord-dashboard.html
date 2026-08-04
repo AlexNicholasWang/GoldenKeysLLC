@@ -112,6 +112,100 @@
       margin-top: 2px;
       display: block;
     }
+
+    /* Stylish Custom Modal Styling */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px 28px;
+      max-width: 440px;
+      width: 90%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      border: 1px solid #f1f5f9;
+      transform: translateY(12px) scale(0.96);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .modal-overlay.active .modal-card {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-title {
+      font-family: 'Marcellus', serif;
+      margin: 0 0 10px 0;
+      font-size: 1.25rem;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-body {
+      font-size: 0.92rem;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .modal-actions button {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .btn-confirm-yes {
+      background-color: #b89146;
+      color: #fff;
+      border: none;
+    }
+
+    .btn-confirm-yes:hover {
+      background-color: #a07d3b;
+    }
+
+    .btn-confirm-no {
+      background-color: #f8fafc;
+      color: #64748b;
+      border: 1px solid #cbd5e1;
+    }
+
+    .btn-confirm-no:hover {
+      background-color: #f1f5f9;
+      color: #334155;
+    }
   </style>
 </head>
 <body class="app-body">
@@ -200,8 +294,53 @@
     </div>
   </main>
 
+  <!-- Cool Modal Container -->
+  <div id="customConfirmModal" class="modal-overlay">
+    <div class="modal-card">
+      <h3 class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b89146" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+        Due Date Past
+      </h3>
+      <div id="customConfirmText" class="modal-body"></div>
+      <div class="modal-actions">
+        <button id="modalBtnNo" class="btn-confirm-no">No, Keep Date</button>
+        <button id="modalBtnYes" class="btn-confirm-yes">Yes, Update Date</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let allTicketsData = [];
+
+    // Custom Async Popup Modal with smooth Fade In / Fade Out
+    function showCustomConfirm(message) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById("customConfirmModal");
+        const msgContainer = document.getElementById("customConfirmText");
+        const btnYes = document.getElementById("modalBtnYes");
+        const btnNo = document.getElementById("modalBtnNo");
+
+        msgContainer.textContent = message;
+
+        function close(result) {
+          modal.classList.remove("active");
+          btnYes.onclick = null;
+          btnNo.onclick = null;
+          // Wait for CSS transition (300ms) before resolving
+          setTimeout(() => {
+            resolve(result);
+          }, 320);
+        }
+
+        btnYes.onclick = () => close(true);
+        btnNo.onclick = () => close(false);
+
+        // Trigger animation
+        requestAnimationFrame(() => {
+          modal.classList.add("active");
+        });
+      });
+    }
 
     // Helper: Get Current Date in EST timezone (YYYY-MM-DD)
     function getEstToday() {
@@ -228,14 +367,12 @@
 
       if (isNaN(targetDay) || targetDay < 1) targetDay = parseInt(parts[2], 10) || 1;
 
-      // Increment month
       month += 1;
       if (month > 12) {
         month = 1;
         year += 1;
       }
 
-      // Determine max days in target month
       const maxDaysInMonth = new Date(year, month, 0).getDate();
       const actualDay = Math.min(targetDay, maxDaysInMonth);
 
@@ -439,6 +576,35 @@
       });
     }
 
+    // Process queued past-due alerts sequentially after client UI load delay
+    async function processPastDueQueue(queue, token) {
+      // 700ms delay after UI dashboard renders
+      await new Promise(r => setTimeout(r, 700));
+
+      for (const item of queue) {
+        const message = `${item.tenantName}'s due date has passed (${item.date}). Want to update it to one month after?`;
+        const confirmed = await showCustomConfirm(message);
+
+        if (confirmed) {
+          const newDueDate = addOneMonthWithDayCap(item.date, item.inputDay.value || item.tenant.day);
+          
+          item.tenant.date = newDueDate;
+          item.fpInstance.setDate(newDueDate, true);
+
+          const payload = {
+            ssoToken: token,
+            tenantEmail: item.tenant.email,
+            address: item.inputAddress.value,
+            rent: parseFloat(item.inputRent.value) || 0.0,
+            day: parseInt(item.inputDay.value, 10) || 0,
+            date: newDueDate
+          };
+
+          saveTenantRecord(payload, item.statusSpan);
+        }
+      }
+    }
+
     window.onload = function() {
       const token = sessionStorage.getItem("googleToken");
       
@@ -468,7 +634,8 @@
         
         const tenants = data.tenants || [];
         allTicketsData = [];
-        const estToday = getEstToday(); // Get current date in EST (YYYY-MM-DD)
+        const estToday = getEstToday();
+        const pastDueQueue = [];
 
         tenants.forEach(tenant => {
           const tenantName = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.email || "Unknown Tenant";
@@ -576,35 +743,30 @@
           
           tbody.appendChild(tr);
 
-          // Check if tenant's due date has passed according to EST time
+          // Queue tenant if due date has passed in EST
           if (tenant.date && estToday > tenant.date) {
-            const displayName = tenantName;
-            const confirmUpdate = confirm(`${displayName}'s due date has past (${tenant.date}). Want to update it to one month after?`);
-            
-            if (confirmUpdate) {
-              const newDueDate = addOneMonthWithDayCap(tenant.date, inputDay.value || tenant.day);
-              
-              // Update local state and Flatpickr UI
-              tenant.date = newDueDate;
-              fpInstance.setDate(newDueDate, true);
-
-              // Auto-save the updated date to backend
-              const payload = {
-                ssoToken: token,
-                tenantEmail: tenant.email,
-                address: inputAddress.value,
-                rent: parseFloat(inputRent.value) || 0.0,
-                day: parseInt(inputDay.value, 10) || 0,
-                date: newDueDate
-              };
-              saveTenantRecord(payload, statusSpan);
-            }
+            pastDueQueue.push({
+              tenant,
+              tenantName,
+              date: tenant.date,
+              inputAddress,
+              inputRent,
+              inputDay,
+              fpInstance,
+              statusSpan
+            });
           }
         });
         
         renderLandlordTickets("tenant");
 
+        // First render the UI visible to the client
         document.getElementById("dashboard").style.display = "block";
+
+        // Delay and trigger overdue date check with modal
+        if (pastDueQueue.length > 0) {
+          processPastDueQueue(pastDueQueue, token);
+        }
       })
       .catch(() => {
         document.getElementById("error").style.display = "block";
