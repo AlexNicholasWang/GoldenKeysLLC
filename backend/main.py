@@ -113,7 +113,7 @@ def prompt(data: PromptRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
+def chat(request: ChatRequest):
     try:
         constitution = get_constitution()
         user_context = request.userData or ""
