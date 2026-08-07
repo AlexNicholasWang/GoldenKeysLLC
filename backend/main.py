@@ -111,7 +111,6 @@ def prompt(data: PromptRequest):
         return {"response": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/chat")
 def chat(request: ChatRequest):
     try:
@@ -119,17 +118,21 @@ def chat(request: ChatRequest):
         user_context = request.userData or ""
         returned_user_data = None
 
-        # Only verify token and hit DB if we haven't already cached the user data
+        # Fetch and inject user context if not cached
         if request.ssoToken and request.code and not user_context:
             try:
                 idinfo = verifyGoogleID(request.ssoToken)
-                email = idinfo.get("email")
-                db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-                landlord = db.landlords.find_one({"code": request.code})
-                
+                email = idinfo.get("email", "").strip().lower()
+                clean_code = request.code.strip()
+
+                mongo_uri = os.environ.get("MONGO_CLIENT_ID", "").strip()
+                db = MongoClient(mongo_uri)["keyfolio"]
+                landlord = db.landlords.find_one({"code": clean_code})
+
                 if landlord:
                     for tenant in landlord.get("tenants", []):
-                        if tenant.get("email") == email:
+                        tenant_email = tenant.get("email", "").strip().lower()
+                        if tenant_email == email:
                             user_context = (
                                 f"\n\n--- CURRENT TENANT CONTEXT ---\n"
                                 f"Name: {tenant.get('first_name', '')} {tenant.get('last_name', '')}\n"
@@ -141,8 +144,13 @@ def chat(request: ChatRequest):
                             )
                             returned_user_data = user_context
                             break
+                    else:
+                        print(f"[CHAT DEBUG] Landlord found for code '{clean_code}', but no matching tenant email for '{email}'")
+                else:
+                    print(f"[CHAT DEBUG] No landlord found matching code '{clean_code}'")
+
             except Exception as e:
-                print(f"Could not inject user context: {e}")
+                print(f"[CHAT ERROR] Could not inject user context: {e}")
 
         system_instruction = constitution + user_context
         contents = []
@@ -175,6 +183,7 @@ def chat(request: ChatRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # 3. Define your router and endpoints
 router = APIRouter(prefix="/api", tags=["Authentication"])
