@@ -4,7 +4,7 @@
 # Env stuff
 .env
 .venv/
-
+venv/
 
 # Dependencies
 node_modules/
