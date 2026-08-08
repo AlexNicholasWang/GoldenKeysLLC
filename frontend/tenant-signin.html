@@ -11,6 +11,31 @@
   <script src="js/config.js"></script>
   <title>Tenant Sign In — Golden Keys LLC</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    /* CSS Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2.5px solid rgba(0, 0, 0, 0.15);
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      color: #555;
+      font-size: 0.95rem;
+    }
+  </style>
 </head>
 <body class="auth-body">
   <div class="auth-topbar">
@@ -33,7 +58,14 @@
 
       <div class="auth-divider">or sign in</div>
 
-      <div class="google-slot"><div id="googleBtn"></div></div>
+      <!-- Displays loading spinner until FastAPI boot up finishes -->
+      <div class="google-slot">
+        <div id="googleBtn">
+          <div class="loading-container">
+            <span class="spinner"></span> Connecting to server...
+          </div>
+        </div>
+      </div>
 
       <p id="status" class="status-line"></p>
     </div>
@@ -41,168 +73,143 @@
   <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
 
   <script>
-    
-    // Keep your handleCredentialResponse function exactly the same as before
-      function handleCredentialResponse(response) {
-	  const statusEl = document.getElementById("status");
-	  statusEl.style.color = "blue";
-	  statusEl.innerText = "Verifying authentication with Keyfolio servers...";
+    function handleCredentialResponse(response) {
+      const statusEl = document.getElementById("status");
+      statusEl.style.color = "#1a73e8";
+      statusEl.innerHTML = '<span class="spinner"></span> Verifying authentication with Keyfolio servers...';
 
-	  // The secure JWT token is inside response.credential
-	  const idToken = response.credential;
-	  sessionStorage.setItem("ssoToken", idToken);
-	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
-	  fetch(API_BASE + '/api/google-sso-tenant-signin', {
-              method: 'POST',
-              headers: {
-		  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ token: idToken })
-	  })
-	      .then(async (res) => {
-		  const data = await res.json();
-		  if (!res.ok) {
-		      throw new Error(data.detail || 'Authentication failed');
-		  }
-		  return data;
-	      })
-	      .then((data) => {
-		  statusEl.style.color = "green";
-		  statusEl.innerText = `Success: ${data.message}`;
-		  console.log("Backend Response:", data);
-		  sessionStorage.setItem("landlordName", data.landlord_name);
-		  sessionStorage.setItem("tenantName", data.tenant_name);
-		  sessionStorage.setItem("code", data.landlord_code);
-		  // Authentication successful! You can now store the profile/token or redirect:
-		  // localStorage.setItem("token", data.token);
-		  window.location.href = "/tenant-dashboard.html";
-	      })
-	      .catch((error) => {
-		  statusEl.style.color = "red";
-		  statusEl.innerText = `Error: ${error.message}`;
-		  console.error("SSO Error:", error);
-	      });
+      const idToken = response.credential;
+      sessionStorage.setItem("ssoToken", idToken);
+
+      fetch(API_BASE + '/api/google-sso-tenant-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: idToken })
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+        return data;
+      })
+      .then((data) => {
+        statusEl.style.color = "green";
+        statusEl.innerText = `Success: ${data.message}`;
+        sessionStorage.setItem("landlordName", data.landlord_name);
+        sessionStorage.setItem("tenantName", data.tenant_name);
+        sessionStorage.setItem("code", data.landlord_code);
+        window.location.href = "/tenant-dashboard.html";
+      })
+      .catch((error) => {
+        statusEl.style.color = "red";
+        statusEl.innerText = `Error: ${error.message}`;
+        console.error("SSO Error:", error);
+      });
+    }
+
+    window.onload = function () {
+      const statusEl = document.getElementById("status");
+      const googleToken = sessionStorage.getItem("googleToken") || sessionStorage.getItem("ssoToken");
+
+      function initGoogleSignIn() {
+        const googleBtn = document.getElementById("googleBtn");
+        
+        fetch(API_BASE + '/api/config')
+          .then((res) => {
+            if (!res.ok) throw new Error("Failed to load server configuration");
+            return res.json();
+          })
+          .then((config) => {
+            googleBtn.innerHTML = ""; // Clear loader once server responds
+            google.accounts.id.initialize({
+              client_id: config.google_client_id,
+              callback: handleCredentialResponse
+            });
+
+            google.accounts.id.renderButton(
+              googleBtn,
+              { theme: "outline", size: "large", text: "signin_with" }
+            );
+
+            google.accounts.id.prompt();
+          })
+          .catch((err) => {
+            googleBtn.innerHTML = "";
+            statusEl.style.color = "red";
+            statusEl.innerText = `Configuration Error: ${err.message}`;
+            console.error(err);
+          });
       }
 
-      // Update window.onload logic to check for stored googleToken first
-      window.onload = function () {
-	  const statusEl = document.getElementById("status");
-	  const googleToken = sessionStorage.getItem("googleToken") || sessionStorage.getItem("ssoToken");
+      if (googleToken) {
+        statusEl.style.color = "#1a73e8";
+        statusEl.innerHTML = '<span class="spinner"></span> Verifying authentication with Keyfolio servers...';
 
-	  function initGoogleSignIn() {
-	      // Fetch public config & render Google Sign-In button
-	      fetch(API_BASE + '/api/config')
-		  .then((res) => {
-		      if (!res.ok) throw new Error("Failed to load server configuration");
-		      return res.json();
-		  })
-		  .then((config) => {
-		      google.accounts.id.initialize({
-			  client_id: config.google_client_id,
-			  callback: handleCredentialResponse
-		      });
-
-		      google.accounts.id.renderButton(
-			  document.getElementById("googleBtn"),
-			  { theme: "outline", size: "large", text: "signin_with" }
-		      );
-
-		      google.accounts.id.prompt();
-		  })
-		  .catch((err) => {
-		      statusEl.style.color = "red";
-		      statusEl.innerText = `Configuration Error: ${err.message}`;
-		      console.error(err);
-		  });
-	  }
-
-	  if (googleToken) {
-	      statusEl.style.color = "blue";
-	      statusEl.innerText = "Verifying authentication with Keyfolio servers...";
-
-	      // Directly attempt backend login with stored token
-	      fetch(API_BASE + '/api/google-sso-tenant-signin', {
-		  method: 'POST',
-		  headers: {
-		      'Content-Type': 'application/json'
-		  },
-		  body: JSON.stringify({ token: googleToken })
-	      })
-		  .then(async (res) => {
-		      const data = await res.json();
-		      if (!res.ok) {
-			  throw new Error(data.detail || 'Authentication failed');
-		      }
-		      return data;
-		  })
-		  .then((data) => {
-		      statusEl.style.color = "green";
-		      statusEl.innerText = `Success: ${data.message}`;
-		      console.log("Backend Response:", data);
-		      sessionStorage.setItem("landlordName", data.landlord_name);
-		      sessionStorage.setItem("tenantName", data.tenant_name);
-		      sessionStorage.setItem("code", data.landlord_code);
-		      sessionStorage.setItem("ssoToken", googleToken);
-		      window.location.href = "/tenant-dashboard.html";
-		  })
-		  .catch((error) => {
-		      statusEl.style.color = "red";
-		      statusEl.innerText = `Error: ${error.message}`;
-		      console.error("SSO Error:", error);
-		      // Remove invalid token & prompt Google Sign-In
-		      sessionStorage.removeItem("googleToken");
-		      sessionStorage.removeItem("ssoToken");
-		      initGoogleSignIn();
-		  });
-	  } else {
-	      initGoogleSignIn();
-	  }
-      };
-    
-    // Handle the code verification form submission
-    document.getElementById("codeForm").addEventListener("submit", function(e) {
-        e.preventDefault(); // Stop the page from reloading on submit
-
-        const codeInput = document.getElementById("code").value.trim();
-        const statusEl = document.getElementById("status");
-
-        if (!codeInput) {
-            statusEl.style.color = "red";
-            statusEl.innerText = "Please enter a code.";
-            return;
-        }
-
-        statusEl.style.color = "blue";
-        statusEl.innerText = "Verifying code with server...";
-
-        // Send the code to the FastAPI backend
-        fetch(API_BASE + '/api/verify-code', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ code: codeInput })
+        fetch(API_BASE + '/api/google-sso-tenant-signin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: googleToken })
         })
         .then(async (res) => {
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.detail || 'Verification failed');
-            }
-            return data;
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+          return data;
         })
         .then((data) => {
-            statusEl.style.color = "green";
-            statusEl.innerText = `Success! Landlord Found: ${data.landlord_name}`;
-            console.log("Server response:", data);
-	    sessionStorage.setItem("code", codeInput);
-	    sessionStorage.setItem("landlordName", data.landlord_name);
-	    window.location.href = "tenant-signup.html";
+          statusEl.style.color = "green";
+          statusEl.innerText = `Success: ${data.message}`;
+          sessionStorage.setItem("landlordName", data.landlord_name);
+          sessionStorage.setItem("tenantName", data.tenant_name);
+          sessionStorage.setItem("code", data.landlord_code);
+          sessionStorage.setItem("ssoToken", googleToken);
+          window.location.href = "/tenant-dashboard.html";
         })
         .catch((error) => {
-            statusEl.style.color = "red";
-            statusEl.innerText = `Error: ${error.message}`;
-            console.error("Verification Error:", error);
+          statusEl.style.color = "red";
+          statusEl.innerText = `Error: ${error.message}`;
+          sessionStorage.removeItem("googleToken");
+          sessionStorage.removeItem("ssoToken");
+          initGoogleSignIn();
         });
+      } else {
+        initGoogleSignIn();
+      }
+    };
+
+    document.getElementById("codeForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const codeInput = document.getElementById("code").value.trim();
+      const statusEl = document.getElementById("status");
+
+      if (!codeInput) {
+        statusEl.style.color = "red";
+        statusEl.innerText = "Please enter a code.";
+        return;
+      }
+
+      statusEl.style.color = "#1a73e8";
+      statusEl.innerHTML = '<span class="spinner"></span> Verifying code with server...';
+
+      fetch(API_BASE + '/api/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeInput })
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Verification failed');
+        return data;
+      })
+      .then((data) => {
+        statusEl.style.color = "green";
+        statusEl.innerText = `Success! Landlord Found: ${data.landlord_name}`;
+        sessionStorage.setItem("code", codeInput);
+        sessionStorage.setItem("landlordName", data.landlord_name);
+        window.location.href = "tenant-signup.html";
+      })
+      .catch((error) => {
+        statusEl.style.color = "red";
+        statusEl.innerText = `Error: ${error.message}`;
+      });
     });
   </script>
 </body>

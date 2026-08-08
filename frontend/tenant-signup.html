@@ -11,6 +11,30 @@
   <script src="js/config.js"></script>
   <title>Tenant Sign Up — Golden Keys LLC</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2.5px solid rgba(0, 0, 0, 0.15);
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      color: #555;
+      font-size: 0.95rem;
+    }
+  </style>
 </head>
 <body class="auth-body">
   <div class="auth-topbar">
@@ -26,7 +50,13 @@
       <h2>Create your account</h2>
       <p class="auth-sub">You're joining <strong id="landlord-name">Loading...</strong>'s community. Sign up with Google to continue.</p>
 
-      <div class="google-slot"><div id="googleBtn"></div></div>
+      <div class="google-slot">
+        <div id="googleBtn">
+          <div class="loading-container">
+            <span class="spinner"></span> Connecting to server...
+          </div>
+        </div>
+      </div>
 
       <p id="status" class="status-line"></p>
     </div>
@@ -34,78 +64,67 @@
   <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
 
   <script>
-      document.getElementById('landlord-name').textContent = sessionStorage.getItem('landlordName');
-      // Keep your handleCredentialResponse function exactly the same as before
-      function handleCredentialResponse(response) {
-	  const statusEl = document.getElementById("status");
-	  statusEl.style.color = "blue";
-	  statusEl.innerText = "Verifying authentication with Keyfolio servers...";
+    document.getElementById('landlord-name').textContent = sessionStorage.getItem('landlordName') || 'Landlord';
 
-	  // The secure JWT token is inside response.credential
-	  const idToken = response.credential;
+    function handleCredentialResponse(response) {
+      const statusEl = document.getElementById("status");
+      statusEl.style.color = "#1a73e8";
+      statusEl.innerHTML = '<span class="spinner"></span> Verifying authentication with Keyfolio servers...';
 
-	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
-	  fetch(API_BASE + '/api/google-sso-tenant-signup', {
-              method: 'POST',
-              headers: {
-		  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ token: idToken, code: sessionStorage.getItem("code") })
-	  })
-	      .then(async (res) => {
-		  const data = await res.json();
-		  if (!res.ok) {
-		      throw new Error(data.detail || 'Authentication failed');
-		  }
-		  return data;
-	      })
-	      .then((data) => {
-		  statusEl.style.color = "green";
-		  statusEl.innerText = `Success: ${data.message}`;
-		  console.log("Backend Response:", data);
-		  
-		  // Authentication successful! You can now store the profile/token or redirect:
-		  // localStorage.setItem("token", data.token);
-		  window.location.href = "/tenant-dashboard.html";
-	      })
-	      .catch((error) => {
-		  statusEl.style.color = "red";
-		  statusEl.innerText = `Error: ${error.message}`;
-		  console.error("SSO Error:", error);
-	      });
-      }
+      const idToken = response.credential;
 
-      // Update the window.onload logic to dynamically fetch the config
-      window.onload = function () {
-	  const statusEl = document.getElementById("status");
+      fetch(API_BASE + '/api/google-sso-tenant-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: idToken, code: sessionStorage.getItem("code") })
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+        return data;
+      })
+      .then((data) => {
+        statusEl.style.color = "green";
+        statusEl.innerText = `Success: ${data.message}`;
+        window.location.href = "/tenant-dashboard.html";
+      })
+      .catch((error) => {
+        statusEl.style.color = "red";
+        statusEl.innerText = `Error: ${error.message}`;
+        console.error("SSO Error:", error);
+      });
+    }
 
-	  // 1. Fetch the public config from your FastAPI backend
-	  fetch(API_BASE + '/api/config')
-              .then((res) => {
-		  if (!res.ok) throw new Error("Failed to load server configuration");
-		  return res.json();
-              })
-              .then((config) => {
-		  // 2. Initialize Google GSI using the dynamic ID from backend/.env
-		  google.accounts.id.initialize({
-                      client_id: config.google_client_id, // <-- Dynamic variable from server!
-                      callback: handleCredentialResponse
-		  });
+    window.onload = function () {
+      const statusEl = document.getElementById("status");
+      const googleBtn = document.getElementById("googleBtn");
 
-		  // 3. Render the button now that Google is initialized
-		  google.accounts.id.renderButton(
-                      document.getElementById("googleBtn"),
-                      { theme: "outline", size: "large", text: "signin_with" }
-		  );
+      fetch(API_BASE + '/api/config')
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to load server configuration");
+          return res.json();
+        })
+        .then((config) => {
+          googleBtn.innerHTML = "";
+          google.accounts.id.initialize({
+            client_id: config.google_client_id,
+            callback: handleCredentialResponse
+          });
 
-		  google.accounts.id.prompt(); // Optional One Tap
-              })
-              .catch((err) => {
-		  statusEl.style.color = "red";
-		  statusEl.innerText = `Configuration Error: ${err.message}`;
-		  console.error(err);
-              });
-      };    
-    </script>
+          google.accounts.id.renderButton(
+            googleBtn,
+            { theme: "outline", size: "large", text: "signin_with" }
+          );
+
+          google.accounts.id.prompt();
+        })
+        .catch((err) => {
+          googleBtn.innerHTML = "";
+          statusEl.style.color = "red";
+          statusEl.innerText = `Configuration Error: ${err.message}`;
+          console.error(err);
+        });
+    };    
+  </script>
 </body>
 </html>
