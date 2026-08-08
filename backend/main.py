@@ -12,6 +12,8 @@ import uuid
 from google import genai
 from google.genai import types
 from typing import List, Optional
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
@@ -106,7 +108,6 @@ def prompt(data: PromptRequest):
     try:
         constitution = get_constitution()
         prompt_text = f"{constitution}\n\nUser Data/Context:\n{data.userData}"
-        
         response = client.models.generate_content(
             model="gemini-3.1-flash-lite",
             contents=prompt_text
@@ -154,8 +155,8 @@ def chat(request: ChatRequest):
 
             except Exception as e:
                 print(f"[CHAT ERROR] Could not inject user context: {e}")
-
-        system_instruction = constitution + user_context
+        date = datetime.now(ZoneInfo("America/New_York")).strftime("%A, %B %d, %Y")
+        system_instruction = constitution + user_context + f"\n\nIf you need it, here's the current date: {date}\n\n"
         contents = []
 
         for turn in request.history:
