@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js"></script>
+  <title>Tenant Dashboard — Golden Keys LLC</title>
+</head>
+<body class="app-body" onload="fetchTenantData()">
+
+  <div class="app-bar">
+    <a class="brand" href="tenant-dashboard.html">
+      <img src="assets/logo.png" alt="Golden Keys LLC logo" style="height:38px">
+      <span class="brand-name">Golden Keys<small>Tenant</small></span>
+    </a>
+    <div class="spacer"></div>
+    <a class="btn btn-outline" href="tenant-chatbot.html">Chatbot</a>
+    <a class="btn btn-outline" href="index.html">Go Home</a>
+  </div>
+
+  <main class="app-main">
+    <div class="rule-label align-left">Tenant dashboard</div>
+    <h2 id="welcomeMessage"></h2>
+    <p class="app-sub">Your lease details and maintenance requests, kept current by your landlord.</p>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav" style="display: flex; gap: 10px; margin-bottom: 24px;">
+      <button id="tabLeaseBtn" class="btn" onclick="switchTenantTab('lease')">Your Lease</button>
+      <button id="tabTicketsBtn" class="btn btn-outline" onclick="switchTenantTab('tickets')">Maintenance Tickets</button>
+    </div>
+
+    <!-- Tab 1: Lease Details -->
+    <div id="leaseTabContent">
+      <h3>Your lease</h3>
+      <div class="panel table-wrap">
+        <table id="tenantTable" class="data-table" style="display: none;">
+          <thead>
+            <tr>
+              <th>First Name</th>
+              <th>Last Name</th>
+              <th>Email</th>
+              <th>Address</th>
+              <th>Rent ($)</th>
+              <th>Day of Month Due</th>
+              <th>Next Due Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td id="firstName"></td>
+              <td id="lastName"></td>
+              <td id="email"></td>
+              <td id="address"></td>
+              <td id="rent"></td>
+              <td id="day"></td>
+              <td id="date"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Tickets & Ticket Creation -->
+    <div id="ticketsTabContent" style="display: none;">
+      <h3>Submit a Ticket</h3>
+      <div class="panel" style="margin-bottom: 24px; padding: 20px;">
+        <form id="createTicketForm" onsubmit="handleCreateTicket(event)">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <label for="ticketType" style="display: block; font-weight: 600; margin-bottom: 6px;">Category</label>
+              <select id="ticketType" required style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">Select Category...</option>
+                <option value="Plumbing">Plumbing</option>
+                <option value="HVAC &amp; Appliances">HVAC &amp; Appliances</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Structural &amp; Grounds">Structural &amp; Grounds</option>
+                <option value="Administrative &amp; Billing">Administrative &amp; Billing</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="urgency" style="display: block; font-weight: 600; margin-bottom: 6px;">Urgency</label>
+              <select id="urgency" required style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="">Select Urgency...</option>
+                <option value="Not urgent">Not urgent</option>
+                <option value="Somewhat Urgent">Somewhat Urgent</option>
+                <option value="ASAP">ASAP</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label for="notes" style="display: block; font-weight: 600; margin-bottom: 6px;">Notes / Description</label>
+            <textarea id="notes" rows="3" required placeholder="Describe the maintenance issue..." style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea>
+          </div>
+          <button type="submit" class="btn">Submit Ticket</button>
+          <span id="ticketStatus" class="status-msg" style="margin-left: 12px;"></span>
+        </form>
+      </div>
+
+      <h3>Your Maintenance Tickets</h3>
+      <div class="panel table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>Category</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th>Date Created</th>
+              <th>Your Notes</th>
+              <th>Landlord's Notes</th>
+            </tr>
+          </thead>
+          <tbody id="ticketsList">
+            <tr><td colspan="7" style="text-align: center;">No tickets submitted yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p id="status" class="status-line"></p>
+  </main>
+
+  <script>
+    function switchTenantTab(tab) {
+      const leaseTab = document.getElementById("leaseTabContent");
+      const ticketsTab = document.getElementById("ticketsTabContent");
+      const leaseBtn = document.getElementById("tabLeaseBtn");
+      const ticketsBtn = document.getElementById("tabTicketsBtn");
+
+      if (tab === "lease") {
+        leaseTab.style.display = "block";
+        ticketsTab.style.display = "none";
+        leaseBtn.className = "btn";
+        ticketsBtn.className = "btn btn-outline";
+      } else {
+        leaseTab.style.display = "none";
+        ticketsTab.style.display = "block";
+        leaseBtn.className = "btn btn-outline";
+        ticketsBtn.className = "btn";
+      }
+    }
+
+    async function fetchTenantData() {
+      const statusElem = document.getElementById("status");
+      const welcomeElem = document.getElementById("welcomeMessage");
+      const code = sessionStorage.getItem("code");
+      const ssoToken = sessionStorage.getItem("ssoToken");
+
+      if (!code || !ssoToken) {
+        statusElem.textContent = "Error: Missing 'code' or 'ssoToken' in sessionStorage.";
+        return;
+      }
+
+      try {
+        const response = await fetch(API_BASE + "/api/get-tenant-data", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            code: code,
+            token: ssoToken
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          statusElem.textContent = "Error: " + (errorData.detail || "Failed to fetch data.");
+          return;
+        }
+
+        const data = await response.json();
+        const firstName = data.first_name || "";
+        const lastName = data.last_name || "";
+
+        welcomeElem.textContent = `Welcome back ${firstName} ${lastName}`.trim();
+
+        document.getElementById("firstName").textContent = firstName;
+        document.getElementById("lastName").textContent = lastName;
+        document.getElementById("email").textContent = data.email || "";
+        document.getElementById("address").textContent = data.address || "";
+        document.getElementById("rent").textContent = data.rent || "";
+        document.getElementById("day").textContent = data.day || "";
+        document.getElementById("date").textContent = data.date || "";
+
+        document.getElementById("tenantTable").style.display = "table";
+
+        renderTenantTickets(data.tickets || []);
+      } catch (err) {
+        statusElem.textContent = "Network error: Unable to connect to server.";
+      }
+    }
+
+    function renderTenantTickets(tickets) {
+      const tbody = document.getElementById("ticketsList");
+      tbody.innerHTML = "";
+
+      if (!tickets || tickets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No tickets submitted yet.</td></tr>';
+        return;
+      }
+
+      tickets.forEach(ticket => {
+        const tr = document.createElement("tr");
+
+        const tdId = document.createElement("td");
+        tdId.textContent = ticket["ticket-id"] || ticket.ticket_id || "";
+
+        const tdCategory = document.createElement("td");
+        tdCategory.textContent = ticket["ticket-type"] || ticket.ticketType || "";
+
+        const tdUrgency = document.createElement("td");
+        tdUrgency.textContent = ticket["ugency"] || ticket.urgency || "";
+
+        const tdStatus = document.createElement("td");
+        tdStatus.textContent = ticket.status || "Incomplete";
+
+        const tdDate = document.createElement("td");
+        tdDate.textContent = ticket["date-created"] || ticket.dateCreated || "";
+
+        const tdTenantNotes = document.createElement("td");
+        tdTenantNotes.textContent = ticket["tenant-notes"] || ticket.notes || "";
+
+        const tdLandlordNotes = document.createElement("td");
+        tdLandlordNotes.textContent = ticket["landlord-notes"] || ticket.landlordNotes || "";
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdCategory);
+        tr.appendChild(tdUrgency);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTenantNotes);
+        tr.appendChild(tdLandlordNotes);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function handleCreateTicket(event) {
+      event.preventDefault();
+      const ticketStatus = document.getElementById("ticketStatus");
+      const ssoToken = sessionStorage.getItem("ssoToken");
+      const code = sessionStorage.getItem("code");
+
+      if (!ssoToken || !code) {
+        ticketStatus.textContent = "Error: Missing authentication details.";
+        ticketStatus.className = "status-msg status-error";
+        return;
+      }
+
+      const ticketType = document.getElementById("ticketType").value;
+      const urgency = document.getElementById("urgency").value;
+      const notes = document.getElementById("notes").value;
+      
+      const dateCreated = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+
+      ticketStatus.textContent = "Submitting ticket...";
+      ticketStatus.className = "status-msg";
+
+      try {
+        const response = await fetch(API_BASE + "/api/create-ticket", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ssoToken: ssoToken,
+            code: code,
+            ticketType: ticketType,
+            dateCreated: dateCreated,
+            notes: notes,
+            urgency: urgency
+          })
+        });
+
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.detail || "Failed to create ticket.");
+        }
+
+        ticketStatus.textContent = "Ticket successfully created!";
+        ticketStatus.className = "status-msg status-success";
+        document.getElementById("createTicketForm").reset();
+
+        fetchTenantData();
+      } catch (err) {
+        ticketStatus.textContent = err.message || "Error creating ticket.";
+        ticketStatus.className = "status-msg status-error";
+      }
+    }
+  </script>
+</body>
+</html>
