@@ -250,7 +250,6 @@
               <th>Rent ($)</th>
               <th>Day of Month Due</th>
               <th>Next Due Date</th>
-              <th>Lease PDF</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -716,83 +715,6 @@
             altInputClass: "date-picker-input",
             allowInput: true
           });
-
-          // Upload PDF Action Column
-          const tdLease = document.createElement("td");
-          tdLease.style.minWidth = "120px";
-          
-          if (tenant.lease_pdf) {
-            const viewBtn = document.createElement("a");
-            viewBtn.href = tenant.lease_pdf;
-            viewBtn.target = "_blank";
-            viewBtn.textContent = "View";
-            viewBtn.className = "btn";
-            viewBtn.style.marginRight = "6px";
-            viewBtn.style.padding = "2px 6px";
-            viewBtn.style.fontSize = "0.75rem";
-            tdLease.appendChild(viewBtn);
-          }
-          
-          const fileInput = document.createElement("input");
-          fileInput.type = "file";
-          fileInput.accept = "application/pdf";
-          fileInput.style.width = "90px";
-          fileInput.style.fontSize = "0.7rem";
-          
-          const uploadBtn = document.createElement("button");
-          uploadBtn.textContent = "↑";
-          uploadBtn.className = "btn btn-outline";
-          uploadBtn.style.padding = "2px 6px";
-          uploadBtn.style.marginLeft = "4px";
-          
-          const uploadStatus = document.createElement("div");
-          uploadStatus.className = "status-msg";
-          
-          uploadBtn.onclick = function() {
-            const file = fileInput.files[0];
-            if (!file) {
-              uploadStatus.textContent = "Select a PDF";
-              uploadStatus.className = "status-msg status-error";
-              return;
-            }
-            uploadStatus.textContent = "Uploading...";
-            uploadStatus.className = "status-msg";
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-              const base64 = e.target.result;
-              fetch(API_BASE + "/api/upload-lease", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  ssoToken: token,
-                  tenantEmail: tenant.email,
-                  pdfBase64: base64
-                })
-              })
-              .then(res => res.json())
-              .then(data => {
-                if (data.message === "Lease uploaded successfully") {
-                   uploadStatus.textContent = "Uploaded!";
-                   uploadStatus.className = "status-msg status-success";
-                   tenant.lease_pdf = base64;
-                } else {
-                   uploadStatus.textContent = data.detail || "Error";
-                   uploadStatus.className = "status-msg status-error";
-                }
-              })
-              .catch(err => {
-                uploadStatus.textContent = "Error";
-                uploadStatus.className = "status-msg status-error";
-              });
-            };
-            reader.readAsDataURL(file);
-          };
-          
-          tdLease.appendChild(fileInput);
-          tdLease.appendChild(uploadBtn);
-          tdLease.appendChild(uploadStatus);
-          tr.appendChild(tdLease);
 
           // Submit Action & Feedback Status
           const tdAction = document.createElement("td");

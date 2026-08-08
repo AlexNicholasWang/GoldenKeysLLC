@@ -149,7 +149,9 @@ def chat(request: ChatRequest):
                                 f"Rent Amount: ${tenant.get('rent', 'Unknown')}\n"
                                 f"Rent Due Day: {tenant.get('day', 'Unknown')} of the month\n"
                                 f"Landlord Name: {landlord.get('first_name', '')} {landlord.get('last_name', '')}\n"
+                                f"START OF LEASE:\n\n {tenant.get('lease_pdf', 'NO LEASE UPLOADED')}\n\n"
                             )
+                            print(len(user_context), flush=True)
                             returned_user_data = user_context
                             break
                     else:
