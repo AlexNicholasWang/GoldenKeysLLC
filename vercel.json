@@ -2,11 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "builds": [
     {
-      "src": "Backend/main.py",
+      "src": "backend/main.py",
       "use": "@vercel/python"
     },
     {
-      "src": "Frontend/**",
+      "src": "frontend/**",
       "use": "@vercel/static"
     }
   ],
@@ -17,7 +17,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "Frontend/$1"
+      "dest": "frontend/$1"
     }
   ]
 }
