@@ -35,6 +35,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 3. Define your router and endpoints
+router = APIRouter(prefix="/api", tags=["Authentication"])
 
 api_key = os.getenv("GEMINI_CLIENT_ID", "").strip()
 client = genai.Client(api_key=api_key)
@@ -98,7 +100,7 @@ def verifyGoogleID(token: str) -> dict:
 def user_is_onboarded(user) -> bool:
     return user.get("onboarded", False)
 
-@app.post("/api/prompt")
+@router.post("/prompt")
 def prompt(data: PromptRequest):
     try:
         constitution = get_constitution()
@@ -111,7 +113,7 @@ def prompt(data: PromptRequest):
         return {"response": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-@app.post("/api/chat")
+@router.post("/chat")
 def chat(request: ChatRequest):
     try:
         constitution = get_constitution()
@@ -183,10 +185,6 @@ def chat(request: ChatRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# 3. Define your router and endpoints
-router = APIRouter(prefix="/api", tags=["Authentication"])
 
 class TicketEditBody(BaseModel):
     ssoToken: str
