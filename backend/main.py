@@ -14,6 +14,10 @@ from google.genai import types
 from typing import List, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from flask import Flask, request, jsonify, Response
+import gridfs
+from pypdf import PdfReader
+from bson import ObjectId
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
@@ -145,7 +149,9 @@ def chat(request: ChatRequest):
                                 f"Rent Amount: ${tenant.get('rent', 'Unknown')}\n"
                                 f"Rent Due Day: {tenant.get('day', 'Unknown')} of the month\n"
                                 f"Landlord Name: {landlord.get('first_name', '')} {landlord.get('last_name', '')}\n"
+                                f"START OF LEASE:\n\n {tenant.get('lease_pdf', 'NO LEASE UPLOADED')}\n\n"
                             )
+                            print(len(user_context), flush=True)
                             returned_user_data = user_context
                             break
                     else:
@@ -307,6 +313,30 @@ def change_tenant_info(body: TenantChangeBody):
         raise HTTPException(status_code=503, detail=f"Database error during sign-in: {exc}") from exc
     return message
 
+
+class UploadLeaseBody(BaseModel):
+    ssoToken: str
+    tenantEmail: str
+    pdfBase64: str
+
+@router.post("/upload-lease")
+def upload_lease(body: UploadLeaseBody):
+    idinfo = verifyGoogleID(body.ssoToken)
+    email = idinfo.get("email")
+    try:
+        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
+        result = db.landlords.update_one(
+            {"email": email, "tenants.email": body.tenantEmail},
+            {"$set": {"tenants.$.lease_pdf": body.pdfBase64}}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Tenant not found under this landlord")
+        return {"message": "Lease uploaded successfully"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 class GoogleTokenBody(BaseModel):
     token: str
 
@@ -336,6 +366,7 @@ def get_tenant_data(body: TenantDataRequestBody):
                     "date": tenant.get("date"),
                     "day": tenant.get("day"),
                     "rent": tenant.get("rent"),
+                    "lease_pdf": tenant.get("lease_pdf"),
                     "tickets": tenant.get("tickets"),
                 }
         raise HTTPException(status_code=404, detail="No tenant found.")

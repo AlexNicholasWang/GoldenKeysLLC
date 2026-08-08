@@ -1,6 +1,6 @@
 # Emacs stuff
 *~
-
+#*
 # Env stuff
 .env
 .venv/
