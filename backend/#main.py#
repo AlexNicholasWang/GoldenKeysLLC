@@ -311,30 +311,6 @@ def change_tenant_info(body: TenantChangeBody):
         raise HTTPException(status_code=503, detail=f"Database error during sign-in: {exc}") from exc
     return message
 
-
-class UploadLeaseBody(BaseModel):
-    ssoToken: str
-    tenantEmail: str
-    pdfBase64: str
-
-@router.post("/upload-lease")
-def upload_lease(body: UploadLeaseBody):
-    idinfo = verifyGoogleID(body.ssoToken)
-    email = idinfo.get("email")
-    try:
-        db = MongoClient(os.environ.get("MONGO_CLIENT_ID", "").strip())["keyfolio"]
-        result = db.landlords.update_one(
-            {"email": email, "tenants.email": body.tenantEmail},
-            {"$set": {"tenants.$.lease_pdf": body.pdfBase64}}
-        )
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Tenant not found under this landlord")
-        return {"message": "Lease uploaded successfully"}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-
 class GoogleTokenBody(BaseModel):
     token: str
 
@@ -364,7 +340,6 @@ def get_tenant_data(body: TenantDataRequestBody):
                     "date": tenant.get("date"),
                     "day": tenant.get("day"),
                     "rent": tenant.get("rent"),
-                    "lease_pdf": tenant.get("lease_pdf"),
                     "tickets": tenant.get("tickets"),
                 }
         raise HTTPException(status_code=404, detail="No tenant found.")

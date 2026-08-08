@@ -62,6 +62,7 @@
             </tr>
           </tbody>
         </table>
+        <div id="leaseDocumentContainer" style="margin-top: 20px; padding: 10px 0;"></div>
       </div>
     </div>
 
@@ -190,6 +191,14 @@
         document.getElementById("date").textContent = data.date || "";
 
         document.getElementById("tenantTable").style.display = "table";
+
+        // Render Lease PDF link if available
+        const leaseContainer = document.getElementById("leaseDocumentContainer");
+        if (data.lease_pdf) {
+            leaseContainer.innerHTML = `<a href="${data.lease_pdf}" download="Lease_${firstName}_${lastName}.pdf" class="btn" target="_blank">View / Download Lease PDF</a>`;
+        } else {
+            leaseContainer.innerHTML = `<p class="status-msg">No lease document uploaded yet.</p>`;
+        }
 
         renderTenantTickets(data.tickets || []);
       } catch (err) {
