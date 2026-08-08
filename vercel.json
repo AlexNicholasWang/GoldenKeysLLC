@@ -2,22 +2,22 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "builds": [
     {
-      "src": "backend/main.py",
+      "src": "Backend/main.py",
       "use": "@vercel/python"
     },
     {
-      "src": "frontend/**",
+      "src": "Frontend/**",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/main.py"
+      "dest": "Backend/main.py"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/$1"
+      "dest": "Frontend/$1"
     }
   ]
 }
