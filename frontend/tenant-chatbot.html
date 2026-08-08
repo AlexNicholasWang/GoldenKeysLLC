@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Marcellus&display=swap" rel="stylesheet">
+  <script src="js/config.js"></script>
   
   <style>
     /* Keyfolio Design System */
@@ -293,7 +294,7 @@
   </main>
 
   <script>
-    const API_URL = "http://127.0.0.1:8000/api/chat";
+    const API_URL = API_BASE + "/api/chat";
     const history = [];
     
     // Store user data after the first authenticated request
