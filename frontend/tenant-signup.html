@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js"></script>
+  <title>Tenant Sign Up — Golden Keys LLC</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="auth-body">
+  <div class="auth-topbar">
+    <a class="brand" href="index.html">
+      <img src="assets/logo.png" alt="Golden Keys LLC logo" style="height:40px">
+      <span class="brand-name">Golden Keys<small>Keyfolio</small></span>
+    </a>
+  </div>
+  <main class="auth-main">
+    <div class="auth-card">
+      <img class="logo" src="assets/logo.png" alt="Golden Keys LLC">
+      <div class="rule-label">Tenant portal</div>
+      <h2>Create your account</h2>
+      <p class="auth-sub">You're joining <strong id="landlord-name">Loading...</strong>'s community. Sign up with Google to continue.</p>
+
+      <div class="google-slot"><div id="googleBtn"></div></div>
+
+      <p id="status" class="status-line"></p>
+    </div>
+  </main>
+  <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
+
+  <script>
+      document.getElementById('landlord-name').textContent = sessionStorage.getItem('landlordName');
+      // Keep your handleCredentialResponse function exactly the same as before
+      function handleCredentialResponse(response) {
+	  const statusEl = document.getElementById("status");
+	  statusEl.style.color = "blue";
+	  statusEl.innerText = "Verifying authentication with Keyfolio servers...";
+
+	  // The secure JWT token is inside response.credential
+	  const idToken = response.credential;
+
+	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
+	  fetch(API_BASE + '/api/google-sso-tenant-signup', {
+              method: 'POST',
+              headers: {
+		  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ token: idToken, code: sessionStorage.getItem("code") })
+	  })
+	      .then(async (res) => {
+		  const data = await res.json();
+		  if (!res.ok) {
+		      throw new Error(data.detail || 'Authentication failed');
+		  }
+		  return data;
+	      })
+	      .then((data) => {
+		  statusEl.style.color = "green";
+		  statusEl.innerText = `Success: ${data.message}`;
+		  console.log("Backend Response:", data);
+		  
+		  // Authentication successful! You can now store the profile/token or redirect:
+		  // localStorage.setItem("token", data.token);
+		  window.location.href = "/tenant-dashboard.html";
+	      })
+	      .catch((error) => {
+		  statusEl.style.color = "red";
+		  statusEl.innerText = `Error: ${error.message}`;
+		  console.error("SSO Error:", error);
+	      });
+      }
+
+      // Update the window.onload logic to dynamically fetch the config
+      window.onload = function () {
+	  const statusEl = document.getElementById("status");
+
+	  // 1. Fetch the public config from your FastAPI backend
+	  fetch(API_BASE + '/api/config')
+              .then((res) => {
+		  if (!res.ok) throw new Error("Failed to load server configuration");
+		  return res.json();
+              })
+              .then((config) => {
+		  // 2. Initialize Google GSI using the dynamic ID from backend/.env
+		  google.accounts.id.initialize({
+                      client_id: config.google_client_id, // <-- Dynamic variable from server!
+                      callback: handleCredentialResponse
+		  });
+
+		  // 3. Render the button now that Google is initialized
+		  google.accounts.id.renderButton(
+                      document.getElementById("googleBtn"),
+                      { theme: "outline", size: "large", text: "signin_with" }
+		  );
+
+		  google.accounts.id.prompt(); // Optional One Tap
+              })
+              .catch((err) => {
+		  statusEl.style.color = "red";
+		  statusEl.innerText = `Configuration Error: ${err.message}`;
+		  console.error(err);
+              });
+      };    
+    </script>
+</body>
+</html>

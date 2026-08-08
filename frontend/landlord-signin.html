@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js"></script>
+  <title>Landlord Sign In — Golden Keys LLC</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="auth-body">
+  <div class="auth-topbar">
+    <a class="brand" href="index.html">
+      <img src="assets/logo.png" alt="Golden Keys LLC logo" style="height:40px">
+      <span class="brand-name">Golden Keys<small>Keyfolio</small></span>
+    </a>
+  </div>
+  <main class="auth-main">
+    <div class="auth-card">
+      <img class="logo" src="assets/logo.png" alt="Golden Keys LLC">
+      <div class="rule-label">Landlord portal</div>
+      <h2>Welcome back</h2>
+      <p class="auth-sub">Sign in or create your account with Google to manage your community.</p>
+
+      <div class="google-slot"><div id="googleBtn"></div></div>
+
+      <p id="status" class="status-line"></p>
+    </div>
+  </main>
+  <p class="auth-footnote"><a href="index.html">&larr; Back to home</a></p>
+
+  <script>
+      // Keep your handleCredentialResponse function exactly the same as before
+      function handleCredentialResponse(response) {
+	  const statusEl = document.getElementById("status");
+	  statusEl.style.color = "blue";
+	  statusEl.innerText = "Verifying authentication with Keyfolio servers...";
+
+	  // The secure JWT token is inside response.credential
+	  const idToken = response.credential;
+
+	  // 2. Make the POST request to your FastAPI /api/google-sso endpoint
+	  fetch(API_BASE + '/api/google-sso-landlord', {
+              method: 'POST',
+              headers: {
+		  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ token: idToken })
+	  })
+	      .then(async (res) => {
+		  const data = await res.json();
+		  if (!res.ok) {
+		      throw new Error(data.detail || 'Authentication failed');
+		  }
+		  return data;
+	      })
+	      .then((data) => {
+		  statusEl.style.color = "green";
+		  statusEl.innerText = `Success: ${data.message}`;
+		  console.log("Backend Response:", data);
+		  sessionStorage.setItem("firstName", data.firstName);
+		  sessionStorage.setItem("lastName", data.lastName);
+		  sessionStorage.setItem("code", data.code);
+		  console.log(idToken);
+		  sessionStorage.setItem("googleToken", idToken);
+		  // Authentication successful! You can now store the profile/token or redirect:
+		  // localStorage.setItem("token", data.token);
+		  window.location.href = "landlord-dashboard.html";
+	      })
+	      .catch((error) => {
+		  statusEl.style.color = "red";
+		  statusEl.innerText = `Error: ${error.message}`;
+		  console.error("SSO Error:", error);
+	      });
+      }
+
+      // Update window.onload logic to check for stored googleToken first
+      window.onload = function () {
+	  const statusEl = document.getElementById("status");
+	  const googleToken = sessionStorage.getItem("googleToken") || sessionStorage.getItem("ssoToken");
+
+	  function initGoogleSignIn() {
+	      // Fetch public config & render Google Sign-In button
+	      fetch(API_BASE + '/api/config')
+		  .then((res) => {
+		      if (!res.ok) throw new Error("Failed to load server configuration");
+		      return res.json();
+		  })
+		  .then((config) => {
+		      google.accounts.id.initialize({
+			  client_id: config.google_client_id,
+			  callback: handleCredentialResponse
+		      });
+
+		      google.accounts.id.renderButton(
+			  document.getElementById("googleBtn"),
+			  { theme: "outline", size: "large", text: "signin_with" }
+		      );
+
+		      google.accounts.id.prompt();
+		  })
+		  .catch((err) => {
+		      statusEl.style.color = "red";
+		      statusEl.innerText = `Configuration Error: ${err.message}`;
+		      console.error(err);
+		  });
+	  }
+
+	  if (googleToken) {
+	      statusEl.style.color = "blue";
+	      statusEl.innerText = "Verifying authentication with Keyfolio servers...";
+
+	      // Directly attempt backend login with stored token
+	      fetch(API_BASE + '/api/google-sso-landlord', {
+		  method: 'POST',
+		  headers: {
+		      'Content-Type': 'application/json'
+		  },
+		  body: JSON.stringify({ token: googleToken })
+	      })
+		  .then(async (res) => {
+		      const data = await res.json();
+		      if (!res.ok) {
+			  throw new Error(data.detail || 'Authentication failed');
+		      }
+		      return data;
+		  })
+		  .then((data) => {
+		      statusEl.style.color = "green";
+		      statusEl.innerText = `Success: ${data.message}`;
+		      console.log("Backend Response:", data);
+		      sessionStorage.setItem("firstName", data.firstName);
+		      sessionStorage.setItem("lastName", data.lastName);
+		      sessionStorage.setItem("code", data.code);
+		      sessionStorage.setItem("googleToken", googleToken);
+		      window.location.href = "landlord-dashboard.html";
+		  })
+		  .catch((error) => {
+		      statusEl.style.color = "red";
+		      statusEl.innerText = `Error: ${error.message}`;
+		      console.error("SSO Error:", error);
+		      // Remove invalid token & prompt Google Sign-In
+		      sessionStorage.removeItem("googleToken");
+		      sessionStorage.removeItem("ssoToken");
+		      initGoogleSignIn();
+		  });
+	  } else {
+	      initGoogleSignIn();
+	  }
+      };    
+    </script>
+</body>
+</html>
